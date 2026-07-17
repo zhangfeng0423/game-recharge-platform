@@ -20,7 +20,14 @@ import {
   testSupabaseConnection,
 } from "@/lib/supabase-server-simplified";
 
-describe("认证系统测试", () => {
+const hasSupabaseEnv = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
+const describeWithSupabase = hasSupabaseEnv ? describe : describe.skip;
+
+describeWithSupabase("认证系统测试", () => {
   beforeAll(async () => {
     console.log("开始认证系统测试...");
 
@@ -81,9 +88,6 @@ describe("认证系统测试", () => {
       // 这是最重要的测试 - 确保修复了 AUTH_001 问题
       const result = await getCurrentUser();
 
-      // 不应该抛出异常
-      expect(result).not.toThrow();
-
       // 对于未登录状态，应该返回 null
       // 如果有用户登录，应该返回用户对象
       expect(result === null || typeof result === "object").toBe(true);
@@ -91,9 +95,6 @@ describe("认证系统测试", () => {
 
     it("改进的 getCurrentUser 应该正常工作", async () => {
       const result = await getCurrentUserImproved();
-
-      // 不应该抛出异常
-      expect(result).not.toThrow();
 
       // 对于未登录状态，应该返回 null
       // 如果有用户登录，应该返回用户对象
@@ -192,7 +193,7 @@ describe("认证系统测试", () => {
   });
 });
 
-describe("集成测试", () => {
+describeWithSupabase("集成测试", () => {
   describe("完整认证流程测试", () => {
     it("应该能够处理完整的认证检查流程", async () => {
       // 测试从客户端到服务端的完整流程

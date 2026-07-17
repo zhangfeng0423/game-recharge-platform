@@ -8,16 +8,16 @@ import type { Database } from "@/lib/supabase-types";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getCurrentUser } from "./auth.actions";
 
-// Initialize Stripe with enhanced configuration
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY is not set in environment variables");
+function getStripeClient(): Stripe | null {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  return secretKey
+    ? new Stripe(secretKey, {
+        apiVersion: "2024-06-20" as any,
+        typescript: true,
+        telemetry: false,
+      })
+    : null;
 }
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20" as any,
-  typescript: true,
-  telemetry: false, // Disable Stripe telemetry for better privacy
-});
 
 // Constants for error handling and validation
 const MINIMUM_AMOUNT_CENTS = 50; // $0.50 minimum
@@ -99,6 +99,14 @@ export const createCheckoutSession = actionClient
     let user: any = null;
     
     try {
+      const stripe = getStripeClient();
+      if (!stripe) {
+        return {
+          success: false,
+          message: "Payment service is not configured.",
+        };
+      }
+
       // Use the same authentication method as login functionality
       user = await getCurrentUser();
 
