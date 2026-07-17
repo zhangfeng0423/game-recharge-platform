@@ -4,19 +4,23 @@ import Stripe from "stripe";
 import type { Database } from "@/lib/supabase-types";
 import { createSupabaseAdminClient } from "@/lib/supabaseServer";
 
-// Ensure environment variables are set
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+function getStripeConfig() {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-if (!stripeSecretKey || !webhookSecret) {
-  throw new Error("Stripe environment variables are not set.");
+  if (!stripeSecretKey || !webhookSecret) {
+    return null;
+  }
+
+  return {
+    webhookSecret,
+    stripe: new Stripe(stripeSecretKey, {
+      apiVersion: "2024-06-20" as any,
+      typescript: true,
+      telemetry: false,
+    }),
+  };
 }
-
-const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2024-06-20" as any,
-  typescript: true,
-  telemetry: false, // Disable Stripe telemetry for better privacy
-});
 
 // Webhook event types we handle
 const SUPPORTED_EVENT_TYPES = [
@@ -93,6 +97,13 @@ async function updateOrderStatus(
 
 export async function POST(req: Request) {
   const startTime = Date.now();
+  const stripeConfig = getStripeConfig();
+
+  if (!stripeConfig) {
+    return new Response("Stripe webhook is not configured", { status: 503 });
+  }
+
+  const { stripe, webhookSecret } = stripeConfig;
   const body = await req.text();
   const requestHeaders = await headers();
   const signature = requestHeaders.get("stripe-signature");
