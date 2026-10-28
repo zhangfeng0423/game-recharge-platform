@@ -17,6 +17,7 @@ export function MerchantDashboardError({
     <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
       <div className="text-red-600 mb-4">
         <svg
+          aria-hidden="true"
           className="mx-auto h-12 w-12"
           fill="none"
           viewBox="0 0 24 24"
@@ -30,12 +31,11 @@ export function MerchantDashboardError({
           />
         </svg>
       </div>
-      <h3 className="text-lg font-medium text-red-800 mb-2">
-        Dashboard Error
-      </h3>
+      <h3 className="text-lg font-medium text-red-800 mb-2">Dashboard Error</h3>
       <p className="text-red-600 mb-4">{error}</p>
       {onRetry && (
         <button
+          type="button"
           onClick={onRetry}
           className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
         >

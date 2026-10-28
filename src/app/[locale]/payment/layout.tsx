@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
 interface PaymentLayoutProps {
   children: ReactNode;
@@ -9,7 +9,7 @@ interface PaymentLayoutProps {
 
 export default function PaymentLayout({ children }: PaymentLayoutProps) {
   const t = useTranslations("payment");
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -32,6 +32,7 @@ export default function PaymentLayout({ children }: PaymentLayoutProps) {
             <div className="flex flex-col md:flex-row justify-between items-center text-sm text-slate-600 dark:text-slate-400">
               <div className="flex items-center space-x-2 mb-2 md:mb-0">
                 <svg
+                  aria-hidden="true"
                   className="w-4 h-4 text-green-600"
                   fill="currentColor"
                   viewBox="0 0 20 20"

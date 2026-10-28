@@ -1,22 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ width: string; height: string }> }
+  { params }: { params: Promise<{ width: string; height: string }> },
 ) {
   const { width, height } = await params;
   const { searchParams } = new URL(request.url);
-  const text = searchParams.get('text') || `${width}x${height}`;
+  const text = searchParams.get("text") || `${width}x${height}`;
 
   // Parse width and height as numbers
   const w = parseInt(width, 10);
   const h = parseInt(height, 10);
 
   // Validate dimensions
-  if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0 || w > 2000 || h > 2000) {
+  if (
+    Number.isNaN(w) ||
+    Number.isNaN(h) ||
+    w <= 0 ||
+    h <= 0 ||
+    w > 2000 ||
+    h > 2000
+  ) {
     return NextResponse.json(
-      { error: 'Invalid dimensions. Width and height must be numbers between 1 and 2000.' },
-      { status: 400 }
+      {
+        error:
+          "Invalid dimensions. Width and height must be numbers between 1 and 2000.",
+      },
+      { status: 400 },
     );
   }
 
@@ -42,15 +52,15 @@ export async function GET(
     // Return SVG with proper headers
     return new NextResponse(svg.trim(), {
       headers: {
-        'Content-Type': 'image/svg+xml',
-        'Cache-Control': 'public, max-age=86400', // Cache for 1 day
+        "Content-Type": "image/svg+xml",
+        "Cache-Control": "public, max-age=86400", // Cache for 1 day
       },
     });
   } catch (error) {
-    console.error('Error generating placeholder:', error);
+    console.error("Error generating placeholder:", error);
     return NextResponse.json(
-      { error: 'Failed to generate placeholder image' },
-      { status: 500 }
+      { error: "Failed to generate placeholder image" },
+      { status: 500 },
     );
   }
 }

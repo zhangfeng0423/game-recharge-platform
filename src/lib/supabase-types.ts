@@ -46,6 +46,12 @@ export interface Sku extends BaseTimestamps {
 }
 
 export interface Order extends BaseTimestamps {
+  player_account?: string | null;
+  game_server?: string | null;
+  fulfillment_status?: "pending" | "fulfilled" | "attention";
+  fulfilled_at?: string | null;
+  fulfilled_by?: string | null;
+  fulfillment_note?: string | null;
   id: string; // UUID
   user_id: string; // UUID, references profiles.id
   sku_id: string; // UUID, references skus.id
@@ -256,48 +262,68 @@ export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: Profile;
+        Row: Profile & Record<string, unknown>;
         Insert: Omit<Profile, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Profile>;
+        Relationships: [];
       };
       games: {
-        Row: Game;
+        Row: Game & Record<string, unknown>;
         Insert: Omit<Game, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Game>;
+        Relationships: [];
       };
       skus: {
-        Row: Sku;
+        Row: Sku & Record<string, unknown>;
         Insert: Omit<Sku, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Sku>;
+        Relationships: [];
       };
       orders: {
-        Row: Order;
+        Row: Order & Record<string, unknown>;
         Insert: Omit<Order, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Order>;
+        Relationships: [];
       };
     };
     Views: {
       merchant_analytics: {
-        Row: MerchantAnalytics;
+        Row: MerchantAnalytics & Record<string, unknown>;
+        Relationships: [];
       };
     };
     Functions: {
+      set_order_fulfillment: {
+        Args: { p_order_id: string; p_status: string; p_note: string };
+        Returns: undefined;
+      };
+      apply_checkout_event: {
+        Args: {
+          p_event_id: string;
+          p_order_id: string;
+          p_session_id: string;
+          p_status: string;
+          p_amount: number;
+          p_currency: string;
+        };
+        Returns: undefined;
+      };
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

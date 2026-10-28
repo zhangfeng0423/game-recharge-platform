@@ -9,7 +9,12 @@ interface AnalyticsCardProps {
   trend?: "up" | "down" | "neutral";
 }
 
-export function AnalyticsCard({ title, value, change, trend }: AnalyticsCardProps) {
+export function AnalyticsCard({
+  title,
+  value,
+  change,
+  trend,
+}: AnalyticsCardProps) {
   return (
     <div className="bg-white p-6 rounded-lg border border-gray-200">
       <h3 className="text-sm font-medium text-gray-600 mb-2">{title}</h3>
@@ -17,7 +22,11 @@ export function AnalyticsCard({ title, value, change, trend }: AnalyticsCardProp
       {change && (
         <p
           className={`text-sm ${
-            trend === "up" ? "text-green-600" : trend === "down" ? "text-red-600" : "text-gray-500"
+            trend === "up"
+              ? "text-green-600"
+              : trend === "down"
+                ? "text-red-600"
+                : "text-gray-500"
           }`}
         >
           {change}
@@ -61,13 +70,25 @@ export function DateRangeFilter() {
 }
 
 export function RecentOrdersTable() {
-  return <div className="bg-white p-4 rounded-lg">Recent Orders Table (Placeholder)</div>;
+  return (
+    <div className="bg-white p-4 rounded-lg">
+      Recent Orders Table (Placeholder)
+    </div>
+  );
 }
 
 export function RevenueChart() {
-  return <div className="bg-white p-4 rounded-lg h-64">Revenue Chart (Placeholder)</div>;
+  return (
+    <div className="bg-white p-4 rounded-lg h-64">
+      Revenue Chart (Placeholder)
+    </div>
+  );
 }
 
 export function TopProductsTable() {
-  return <div className="bg-white p-4 rounded-lg">Top Products Table (Placeholder)</div>;
+  return (
+    <div className="bg-white p-4 rounded-lg">
+      Top Products Table (Placeholder)
+    </div>
+  );
 }

@@ -53,11 +53,13 @@ export class DateFormatter {
   static formatRelative(date: string | Date, locale = "en-US"): string {
     const now = new Date();
     const target = new Date(date);
-    const diffInDays = Math.floor((now.getTime() - target.getTime()) / (1000 * 60 * 60 * 24));
+    const diffInDays = Math.floor(
+      (now.getTime() - target.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     if (diffInDays === 0) return "Today";
     if (diffInDays === 1) return "Yesterday";
     if (diffInDays < 7) return `${diffInDays} days ago`;
-    return this.format(date, locale);
+    return DateFormatter.format(date, locale);
   }
 }

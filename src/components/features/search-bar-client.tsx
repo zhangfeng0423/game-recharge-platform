@@ -82,6 +82,7 @@ export function SearchBarClient({ placeholder }: SearchBarClientProps) {
             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           >
             <svg
+              aria-hidden="true"
               className="h-4 w-4"
               fill="none"
               stroke="currentColor"
@@ -99,6 +100,7 @@ export function SearchBarClient({ placeholder }: SearchBarClientProps) {
       </div>
       <Button type="submit" variant="outline">
         <svg
+          aria-hidden="true"
           className="h-4 w-4"
           fill="none"
           stroke="currentColor"

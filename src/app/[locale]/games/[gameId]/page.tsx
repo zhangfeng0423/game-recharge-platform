@@ -5,10 +5,10 @@ import { GameDetailClient } from "@/components/features/game-detail-client";
 import type { GameWithSkus } from "@/lib/supabase-types";
 
 interface GameDetailPageProps {
-  params: {
+  params: Promise<{
     locale: string;
     gameId: string;
-  };
+  }>;
 }
 
 export default async function GameDetailPage({ params }: GameDetailPageProps) {
@@ -24,7 +24,7 @@ export default async function GameDetailPage({ params }: GameDetailPageProps) {
 
   // Get translations for SkuCard components
   const tGames = await getTranslations("games");
-  
+
   const skuCardTranslations = {
     popular: tGames("popular"),
     rechargeButton: tGames("rechargeButton"),

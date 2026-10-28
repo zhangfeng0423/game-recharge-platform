@@ -43,3 +43,8 @@ next-env.d.ts
 
 # claude skills and configuration
 .claude/
+
+# Isolated browser builds and reports
+/.next-e2e/
+/test-results/
+/playwright-report/

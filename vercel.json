@@ -1,16 +1,6 @@
 {
   "buildCommand": "pnpm build",
-  "outputDirectory": ".next",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs",
-  "regions": ["sin1"],
-  "functions": {
-    "src/app/api/webhooks/stripe/route.ts": {
-      "maxDuration": 30
-    }
-  },
-  "env": {
-    "NEXT_PUBLIC_APP_URL": "https://recharge-steel.vercel.app",
-    "NODE_ENV": "production"
-  }
+  "regions": ["sin1"]
 }

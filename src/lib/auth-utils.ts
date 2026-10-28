@@ -2,8 +2,6 @@
  * Authentication utilities for client-side auth management
  */
 
-import { supabase } from "@/lib/supabaseClient";
-
 /**
  * Force clear auth cache on client side
  */

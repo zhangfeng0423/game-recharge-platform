@@ -1,138 +1,124 @@
 "use client";
-
-import { X } from "lucide-react"; // Using lucide-react for icons, common in shadcn/ui
-import Image from "next/image";
-import { useLocale, useTranslations } from "next-intl";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useLocale } from "next-intl";
 import { useState, useTransition } from "react";
 import { createCheckoutSession } from "@/actions/payment.actions";
-import { Button } from "@/components/ui/Button";
 import { formatPrice } from "@/lib/utils";
 import { useSkuModalStore } from "@/stores/useSkuModalStore";
-
 export function SkuDetailModal() {
-  const t = useTranslations("purchase");
-  const tCommon = useTranslations("common");
-  const locale = useLocale();
+  const locale = useLocale() as "en" | "zh";
+  const zh = locale === "zh";
   const { isOpen, sku, closeModal } = useSkuModalStore();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  const handlePurchase = async () => {
-    if (!sku) return;
-
-    setError(null);
-    startTransition(async () => {
-      try {
-        const result = await createCheckoutSession({
-          skuId: sku.id,
-          locale: locale as "en" | "zh",
-        });
-
-        if (result.data?.success && result.data.checkoutUrl) {
-          // Redirect to Stripe Checkout
-          window.location.href = result.data.checkoutUrl;
-        } else {
-          setError(result.data?.message || tCommon("checkoutSessionError"));
-        }
-      } catch (error) {
-        console.error("Checkout error:", error);
-        setError(tCommon("purchaseError"));
-      }
-    });
-  };
-
-  if (!isOpen || !sku) {
-    return null;
-  }
-
-  const skuName = sku.name[locale as keyof typeof sku.name] || sku.name.en;
-  const skuDescription =
-    sku.description?.[locale as keyof typeof sku.description] ||
-    sku.description?.en ||
-    "";
-
+  const [pending, start] = useTransition();
+  const [error, setError] = useState("");
+  const [playerAccount, setPlayerAccount] = useState("");
+  const [gameServer, setGameServer] = useState("");
+  if (!sku) return null;
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
-      onClick={closeModal}
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          closeModal();
+          setError("");
+        }
+      }}
     >
-      <div
-        className="relative m-4 w-full max-w-md transform-gpu rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all dark:bg-gray-800"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={closeModal}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-        >
-          <X size={24} />
-        </button>
-
-        {/* SKU Image - Following PRD prototype */}
-        <div className="relative mb-6 aspect-square w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700">
-          {sku.image_url ? (
-            <Image
-              src={sku.image_url}
-              alt={skuName}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 90vw, 400px"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-center">
-              <div>
-                <div className="text-6xl">💎</div>
-                <p className="mt-2 text-sm text-gray-500">
-                  {tCommon("noImage")}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Bonus Badge - Following PRD prototype */}
-        <div className="mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold text-center">
-          3x In-Game Bonus!
-        </div>
-
-        {/* SKU Details */}
-        <h3 className="mb-4 text-2xl font-bold text-center text-gray-900 dark:text-white">
-          {skuName}
-        </h3>
-
-        {/* Item Breakdown - Following PRD prototype */}
-        <div className="mb-6 text-center space-y-2">
-          <p className="text-gray-700 dark:text-gray-300">
-            <span className="font-semibold">32</span> Base Crystals
-          </p>
-          <p className="text-gray-700 dark:text-gray-300">
-            <span className="font-semibold">4</span> Bonus Crystals
-          </p>
-        </div>
-
-        {/* Price - Following PRD prototype */}
-        <div className="mb-6 text-center">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-            Price:
-          </p>
-          <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 space-y-5 rounded-2xl bg-white p-6 shadow-xl">
+          <Dialog.Title className="text-2xl font-bold">
+            {sku.name[locale]}
+          </Dialog.Title>
+          <Dialog.Description className="whitespace-pre-wrap">
+            {sku.description?.[locale] ??
+              (zh
+                ? "请确认商品与价格后继续。"
+                : "Review the item and price before continuing.")}
+          </Dialog.Description>
+          <p className="text-3xl font-bold">
             {formatPrice(sku.prices.usd, "usd", locale)}
           </p>
-        </div>
-
-        {/* Purchase Button - Following PRD prototype */}
-        <Button
-          className="w-full py-4 text-lg font-semibold"
-          onClick={handlePurchase}
-          disabled={isPending}
-        >
-          {isPending ? t("processing") : t("purchase")}
-        </Button>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mt-4 text-center text-sm text-red-500">{error}</div>
-        )}
-      </div>
-    </div>
+          <p className="text-sm">
+            {zh
+              ? "付款后由人工处理充值，请核对游戏 ID 与区服，切勿填写密码。"
+              : "Recharge is processed manually after payment. Verify your game ID and server. Never enter a password."}
+          </p>
+          <label className="block">
+            {zh ? "游戏 ID" : "Player account ID"}
+            <input
+              className="block w-full rounded border p-2"
+              value={playerAccount}
+              onChange={(e) => setPlayerAccount(e.target.value)}
+              required
+              maxLength={128}
+            />
+          </label>
+          <label className="block">
+            {zh
+              ? "区服（不适用请填 N/A）"
+              : "Game server (enter N/A if not applicable)"}
+            <input
+              className="block w-full rounded border p-2"
+              value={gameServer}
+              onChange={(e) => setGameServer(e.target.value)}
+              required
+              maxLength={128}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={pending || !playerAccount.trim() || !gameServer.trim()}
+            className="w-full rounded bg-blue-600 p-3 text-white disabled:opacity-50"
+            onClick={() => {
+              setError("");
+              start(async () => {
+                try {
+                  const result = await createCheckoutSession({
+                    skuId: sku.id,
+                    playerAccount,
+                    gameServer,
+                    locale,
+                  });
+                  if (result.data?.success && result.data.checkoutUrl)
+                    window.location.assign(result.data.checkoutUrl);
+                  else
+                    setError(
+                      result.data?.message ??
+                        (zh
+                          ? "暂时无法下单，请确认已登录。"
+                          : "Unable to check out. Please ensure you are signed in."),
+                    );
+                } catch {
+                  setError(
+                    zh
+                      ? "下单失败，请稍后重试。"
+                      : "Unable to check out. Please retry later.",
+                  );
+                }
+              });
+            }}
+          >
+            {pending
+              ? zh
+                ? "处理中…"
+                : "Processing…"
+              : zh
+                ? "前往支付"
+                : "Continue to payment"}
+          </button>
+          {error && (
+            <p role="alert" className="text-red-600">
+              {error}
+            </p>
+          )}
+          <Dialog.Close asChild>
+            <button type="button" className="w-full p-2">
+              {zh ? "关闭" : "Close"}
+            </button>
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

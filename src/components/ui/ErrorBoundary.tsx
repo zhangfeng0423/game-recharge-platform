@@ -195,6 +195,7 @@ const DefaultErrorFallback: React.FC<{
           {/* 错误图标 */}
           <div className="w-16 h-16 mx-auto mb-4 bg-[#359EFF]/20 rounded-full flex items-center justify-center">
             <svg
+              aria-hidden="true"
               className="w-8 h-8 text-[#359EFF]"
               fill="none"
               stroke="currentColor"
@@ -242,7 +243,9 @@ const DefaultErrorFallback: React.FC<{
                 </div>
                 {error.userMessage && (
                   <div className="mt-2 p-3 bg-[#359EFF]/10 border border-[#359EFF]/30 rounded-md">
-                    <p className="text-[#359EFF] text-sm">{error.userMessage}</p>
+                    <p className="text-[#359EFF] text-sm">
+                      {error.userMessage}
+                    </p>
                   </div>
                 )}
               </div>
@@ -378,7 +381,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   componentWillUnmount() {
     // 清理重试超时
-    this.retryTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.retryTimeouts.forEach((timeout) => {
+      clearTimeout(timeout);
+    });
   }
 
   // 重试函数
@@ -409,7 +414,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // 重置函数
   handleReset = () => {
     // 清理所有重试超时
-    this.retryTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.retryTimeouts.forEach((timeout) => {
+      clearTimeout(timeout);
+    });
     this.retryTimeouts = [];
 
     this.setState({

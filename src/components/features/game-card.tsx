@@ -19,7 +19,6 @@ export function GameCard({ game, locale, translations }: GameCardProps) {
   // Get the localized game name
   const gameName = game.name[locale as keyof typeof game.name] || game.name.en;
 
-  
   return (
     <Link
       href={`/${locale}/games/${game.id}`}

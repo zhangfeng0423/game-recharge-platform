@@ -524,7 +524,7 @@ export class ErrorHandler {
     if (!this.errorCallbacks.has(category)) {
       this.errorCallbacks.set(category, []);
     }
-    this.errorCallbacks.get(category)!.push(callback);
+    this.errorCallbacks.get(category)?.push(callback);
   }
 
   // 处理错误

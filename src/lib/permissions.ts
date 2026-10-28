@@ -15,11 +15,11 @@ export interface Permission {
 export function hasPermission(
   userRole: UserRole,
   resource: string,
-  action: string
+  action: string,
 ): boolean {
   const permissions = getPermissionsForRole(userRole);
   return permissions.some(
-    (p) => p.resource === resource && p.action === action
+    (p) => p.resource === resource && p.action === action,
   );
 }
 
@@ -43,7 +43,7 @@ export function checkMerchantPermission(userRole: UserRole): boolean {
 export function verifyGameOwnership(
   merchantId: string,
   gameMerchantId: string,
-  userRole: UserRole
+  userRole: UserRole,
 ): boolean {
   if (userRole === "ADMIN") return true;
   return merchantId === gameMerchantId;
@@ -55,7 +55,7 @@ export function verifyGameOwnership(
 export function verifySkuOwnership(
   merchantId: string,
   gameMerchantId: string,
-  userRole: UserRole
+  userRole: UserRole,
 ): boolean {
   if (userRole === "ADMIN") return true;
   return merchantId === gameMerchantId;
