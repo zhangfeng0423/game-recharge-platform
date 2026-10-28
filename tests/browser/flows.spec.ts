@@ -83,3 +83,22 @@ test("checkout remains closed until explicitly enabled and return page never inv
     page.getByRole("heading", { name: "Payment confirmed", exact: true }),
   ).toHaveCount(0);
 });
+
+test("forgot password requests email and reset requires a verified session", async ({
+  page,
+}) => {
+  await page.goto("/en/auth");
+  await page.getByRole("link", { name: "Forgot password?" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Reset your password" }),
+  ).toBeVisible();
+  await page.getByLabel("Email", { exact: true }).fill("buyer@example.test");
+  await page.getByRole("button", { name: "Send reset email" }).click();
+  await expect(
+    page.getByText(
+      "If this email is registered, a reset email will arrive. Open its link in this browser.",
+    ),
+  ).toBeVisible();
+  await page.goto("/en/auth/reset");
+  await expect(page).toHaveURL(/\/en\/auth\/forgot/);
+});

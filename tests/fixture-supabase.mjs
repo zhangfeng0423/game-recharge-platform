@@ -94,6 +94,7 @@ http
       res.end(JSON.stringify(data));
     };
     if (url.pathname === "/health") return json({ ok: true });
+    if (url.pathname === "/auth/v1/recover") return json({});
     if (url.pathname === "/auth/v1/token") {
       const user = users.find((u) => u.email === body.email);
       if (!user || body.password !== "test-password-123")

@@ -155,6 +155,11 @@ export function AuthForm() {
             ? "已有账户？登录"
             : "Have an account? Sign in"}
       </button>
+      {login && (
+        <Link className="block text-blue-700" href={`/${locale}/auth/forgot`}>
+          {zh ? "忘记密码？" : "Forgot password?"}
+        </Link>
+      )}
       <GoogleButton />
     </main>
   );

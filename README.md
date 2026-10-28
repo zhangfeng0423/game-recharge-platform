@@ -7,7 +7,7 @@ A Next.js storefront for USD game top-ups, with Supabase accounts, Stripe Checko
 ## Current scope
 
 - English / Chinese catalogue, game details and accessible product dialogs.
-- Email/password accounts and Google OAuth callback support (requires provider setup).
+- Email/password accounts, email password recovery, and Google OAuth callback support (requires provider setup).
 - Player order history, scoped to the signed-in buyer.
 - Merchant game / SKU create, edit and delete, scoped to the signed-in merchant. Products referenced by orders cannot be deleted.
 - Merchant order queue and an admin overview of accounts and orders.
@@ -52,6 +52,7 @@ The hardening migration removes direct client writes to financial orders and rol
 
 - Configure Supabase Site URL and redirect allowlists for the actual application origins.
 - Email confirmation and production email delivery require working Supabase email settings.
+- Password recovery starts at `/<locale>/auth/forgot`. Allow the exact callback URL `https://YOUR_HOST/<locale>/auth/callback?next=%2F<locale>%2Fauth%2Freset` for each supported locale. The default Supabase recovery template uses `{{ .ConfirmationURL }}`; with PKCE, open the email link in the same browser that requested it. A verified session is required before setting a new password.
 - Configure Google OAuth separately if you want to offer Google sign-in. Its callback is `/<locale>/auth/callback`.
 - A user may register as a merchant. **ADMIN is never inferred from an email address or signup metadata.** Set the initial operator's profile role through trusted database administration after verifying the account.
 - Audit existing ADMIN profiles from the old application before launch: earlier code inferred privilege from email text.
