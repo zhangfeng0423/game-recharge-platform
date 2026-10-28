@@ -42,8 +42,9 @@ For a **fresh** Supabase project, run these SQL files in the SQL editor in this 
 2. `supabase/migrations/9999_merchant_analytics_rpc.sql`
 3. `supabase/migrations/20261028160000_launch_hardening.sql`
 4. `supabase/migrations/20261028170000_manual_fulfillment.sql`
+5. `supabase/migrations/20261028180000_payment_mode.sql`
 
-For a project that already has the two legacy schemas, inspect compatibility and apply only the two new migrations. The legacy filenames do not form a standard timestamp sequence: **do not blindly run `supabase db push`**. Reconcile migration history before adopting automated migrations.
+For a project that already has the two legacy schemas, inspect compatibility and apply only the three new migrations. The legacy filenames do not form a standard timestamp sequence: **do not blindly run `supabase db push`**. Reconcile migration history before adopting automated migrations.
 
 The hardening migration removes direct client writes to financial orders and role assignments, restricts legacy analytics access, creates profiles within account-creation transactions, and adds an atomic payment-event function. The fulfillment migration adds recipient details, a separate delivery lifecycle, and an operator-scoped confirmation function.
 
@@ -76,6 +77,8 @@ Use the matching endpoint signing secret in `STRIPE_WEBHOOK_SECRET`. An unconfig
 5. Perform the recharge outside this application.
 6. Record the verified outcome and a buyer-visible delivery reference. Delivery confirmation records the operator and timestamp. A different merchant cannot update the order.
 7. If recharge cannot be delivered, mark it for follow-up and resolve it with the buyer. Refunds and chargebacks require separate handling in Stripe; this application does not issue refunds or automatically settle funds to merchants.
+
+Test orders are explicitly labeled. Their callbacks must carry test mode; they must never trigger a real game recharge. Historical orders with unknown mode require verification.
 
 An order's `completed` payment status means **paid**, not delivered. Fulfillment uses `pending`, `attention` and `fulfilled` separately. Financial history is retained when product deletion is attempted.
 

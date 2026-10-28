@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { createCheckoutSession } from "@/actions/payment.actions";
 import { formatPrice } from "@/lib/utils";
 import { useSkuModalStore } from "@/stores/useSkuModalStore";
-export function SkuDetailModal() {
+export function SkuDetailModal({ testMode = false }: { testMode?: boolean }) {
   const locale = useLocale() as "en" | "zh";
   const zh = locale === "zh";
   const { isOpen, sku, closeModal } = useSkuModalStore();
@@ -39,6 +39,13 @@ export function SkuDetailModal() {
           <p className="text-3xl font-bold">
             {formatPrice(sku.prices.usd, "usd", locale)}
           </p>
+          {testMode && (
+            <p className="rounded bg-amber-50 p-3 text-amber-900">
+              {zh
+                ? "当前为支付测试模式，不进行真实扣款或充值。"
+                : "Payment test mode: no real charge or recharge."}
+            </p>
+          )}
           <p className="text-sm">
             {zh
               ? "付款后由人工处理充值，请核对游戏 ID 与区服，切勿填写密码。"

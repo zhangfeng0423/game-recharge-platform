@@ -37,6 +37,9 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    readFileSync("supabase/migrations/20261028180000_payment_mode.sql", "utf8"),
+  );
   await db.query(
     `INSERT INTO auth.users(id,raw_user_meta_data) VALUES($1,'{}'),($2,'{"role":"MERCHANT","merchant_name":"Shop A"}'),($3,'{"role":"MERCHANT","merchant_name":"Shop B"}')`,
     [buyer, merchant, other],
@@ -50,7 +53,7 @@ beforeAll(async () => {
     [sku, game],
   );
   await db.query(
-    `INSERT INTO public.orders(id,user_id,sku_id,merchant_id,amount,stripe_checkout_session_id) VALUES($1,$2,$3,$4,100,'cs_paid')`,
+    `INSERT INTO public.orders(id,user_id,sku_id,merchant_id,amount,stripe_checkout_session_id,payment_mode) VALUES($1,$2,$3,$4,100,'cs_paid','test')`,
     [order, buyer, sku, merchant],
   );
 });
@@ -135,7 +138,7 @@ describe("actual PostgreSQL migrations and RLS", () => {
     await asUser(buyer);
     await expect(
       db.query(
-        `SELECT apply_checkout_event('evt_user',$1,'cs_paid','completed',100,'usd')`,
+        `SELECT apply_checkout_event('evt_user',$1,'cs_paid','completed',100,'usd',false)`,
         [order],
       ),
     ).rejects.toThrow(/permission denied/);
@@ -143,13 +146,13 @@ describe("actual PostgreSQL migrations and RLS", () => {
   it("rejects mismatched sessions and amounts atomically", async () => {
     await expect(
       db.query(
-        `SELECT apply_checkout_event('evt_bad',$1,'cs_other','completed',100,'usd')`,
+        `SELECT apply_checkout_event('evt_bad',$1,'cs_other','completed',100,'usd',false)`,
         [order],
       ),
     ).rejects.toThrow(/Session mismatch/);
     await expect(
       db.query(
-        `SELECT apply_checkout_event('evt_bad',$1,'cs_paid','completed',0,'usd')`,
+        `SELECT apply_checkout_event('evt_bad',$1,'cs_paid','completed',0,'usd',false)`,
         [order],
       ),
     ).rejects.toThrow(/mismatch/);
@@ -160,15 +163,15 @@ describe("actual PostgreSQL migrations and RLS", () => {
   });
   it("handles duplicate and delayed events without regressing paid orders", async () => {
     await db.query(
-      `SELECT apply_checkout_event('evt_good',$1,'cs_paid','completed',100,'usd')`,
+      `SELECT apply_checkout_event('evt_good',$1,'cs_paid','completed',100,'usd',false)`,
       [order],
     );
     await db.query(
-      `SELECT apply_checkout_event('evt_good',$1,'cs_paid','completed',100,'usd')`,
+      `SELECT apply_checkout_event('evt_good',$1,'cs_paid','completed',100,'usd',false)`,
       [order],
     );
     await db.query(
-      `SELECT apply_checkout_event('evt_late',$1,'cs_paid','failed',100,'usd')`,
+      `SELECT apply_checkout_event('evt_late',$1,'cs_paid','failed',100,'usd',false)`,
       [order],
     );
     expect(
@@ -234,4 +237,13 @@ describe("manual fulfillment authorization", () => {
       db.query("SELECT set_order_fulfillment($1,'attention','late')", [order]),
     ).rejects.toThrow(/cannot regress/);
   });
+});
+
+it("rejects live-mode events for a test order", async () => {
+  await expect(
+    db.query(
+      "SELECT apply_checkout_event('evt_live_wrong',$1,'cs_paid','completed',100,'usd',true)",
+      [order],
+    ),
+  ).rejects.toThrow(/mode mismatch/);
 });

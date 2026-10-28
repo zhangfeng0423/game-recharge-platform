@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     const db = createSupabaseAdminClient();
     const { error } = await db.rpc("apply_checkout_event", {
       p_event_id: event.id,
+      p_livemode: event.livemode === true,
       p_order_id: session.client_reference_id,
       p_session_id: session.id,
       p_status: expired ? "failed" : "completed",

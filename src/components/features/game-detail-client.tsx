@@ -9,6 +9,7 @@ import type { GameWithSkus, Sku } from "@/lib/supabase-types";
 import { useSkuModalStore } from "@/stores/useSkuModalStore";
 
 interface GameDetailClientProps {
+  testMode?: boolean;
   game: GameWithSkus;
   locale: string;
   skuCardTranslations: {
@@ -20,6 +21,7 @@ interface GameDetailClientProps {
 export function GameDetailClient({
   game,
   locale,
+  testMode = false,
   skuCardTranslations,
 }: GameDetailClientProps) {
   const t = useTranslations("common");
@@ -37,7 +39,7 @@ export function GameDetailClient({
 
   return (
     <>
-      <SkuDetailModal />
+      <SkuDetailModal testMode={testMode} />
       <div className="min-h-screen bg-gray-50">
         {/* Navigation Header */}
         <header className="border-b border-gray-200 bg-white">

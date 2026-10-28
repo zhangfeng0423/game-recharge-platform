@@ -41,6 +41,7 @@ const orders = [
     amount: 1099,
     currency: "usd",
     status: "pending",
+    payment_mode: "test",
     stripe_checkout_session_id: "cs_fixture_pending",
     created_at: time,
     updated_at: time,

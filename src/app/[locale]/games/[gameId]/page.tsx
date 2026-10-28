@@ -32,6 +32,9 @@ export default async function GameDetailPage({ params }: GameDetailPageProps) {
 
   return (
     <GameDetailClient
+      testMode={
+        process.env.STRIPE_SECRET_KEY?.trim().startsWith("sk_test_") === true
+      }
       game={game}
       locale={locale}
       skuCardTranslations={skuCardTranslations}

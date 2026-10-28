@@ -46,6 +46,7 @@ export interface Sku extends BaseTimestamps {
 }
 
 export interface Order extends BaseTimestamps {
+  payment_mode?: "test" | "live" | "unknown";
   player_account?: string | null;
   game_server?: string | null;
   fulfillment_status?: "pending" | "fulfilled" | "attention";
@@ -321,6 +322,7 @@ export type Database = {
           p_status: string;
           p_amount: number;
           p_currency: string;
+          p_livemode: boolean;
         };
         Returns: undefined;
       };

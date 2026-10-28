@@ -41,6 +41,7 @@ function chain(result: { data: unknown; error: unknown }) {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("PAYMENTS_ENABLED", "true");
+  vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fixture");
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_fixture");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://store.example");
   m.user.mockResolvedValue({ id: "buyer", email: "buyer@example.test" });
@@ -89,6 +90,7 @@ it("uses the catalogue price and persists recipient/session before returning a U
   expect(insert.insert).toHaveBeenCalledWith(
     expect.objectContaining({
       amount: 1099,
+      payment_mode: "test",
       merchant_id: "owner",
       user_id: "buyer",
       player_account: "player-001",

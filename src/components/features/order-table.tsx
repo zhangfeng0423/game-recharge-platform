@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { FulfillmentControl } from "./fulfillment-control";
 export interface PortalOrder {
+  payment_mode?: "test" | "live" | "unknown";
   player_account?: string | null;
   game_server?: string | null;
   fulfillment_status?: string;
@@ -68,17 +69,30 @@ export function OrderTable({
                 {formatPrice(o.amount, o.currency, locale)}
               </td>
               <td className="border-b p-3">
-                {o.status === "completed"
-                  ? zh
-                    ? "已收款"
-                    : "Paid"
-                  : o.status === "failed"
+                <p>
+                  {o.status === "completed"
                     ? zh
-                      ? "已失效／失败"
-                      : "Expired / failed"
-                    : zh
-                      ? "待支付确认"
-                      : "Awaiting payment confirmation"}
+                      ? "已收款"
+                      : "Paid"
+                    : o.status === "failed"
+                      ? zh
+                        ? "已失效／失败"
+                        : "Expired / failed"
+                      : zh
+                        ? "待支付确认"
+                        : "Awaiting payment confirmation"}
+                </p>
+                {o.payment_mode !== "live" && (
+                  <p className="text-amber-700">
+                    {o.payment_mode === "test"
+                      ? zh
+                        ? "测试订单，勿实际充值"
+                        : "Test order — do not deliver real goods"
+                      : zh
+                        ? "历史支付需核实"
+                        : "Historical payment needs verification"}
+                  </p>
+                )}
               </td>
               <td className="border-b p-3">
                 {formatDate(o.created_at, locale)}
@@ -105,6 +119,7 @@ export function OrderTable({
                   o.status === "completed" &&
                   o.fulfillment_status !== "fulfilled" && (
                     <FulfillmentControl
+                      testMode={o.payment_mode !== "live"}
                       orderId={o.id}
                       locale={locale as "en" | "zh"}
                     />

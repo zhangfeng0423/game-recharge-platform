@@ -36,6 +36,13 @@ export default async function PaymentSuccess({
               ? "支付未完成"
               : "Payment not completed"}
       </h1>
+      {order.payment_mode !== "live" && (
+        <p className="rounded bg-amber-50 p-3">
+          {zh
+            ? "测试／未核实订单，不代表真实付款，请勿实际充值。"
+            : "Test / unverified order. This does not represent a verified real payment; do not deliver real goods."}
+        </p>
+      )}
       <p>
         {pending
           ? zh

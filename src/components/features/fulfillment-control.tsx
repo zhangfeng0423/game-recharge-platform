@@ -5,9 +5,11 @@ import { fulfillOrder } from "@/actions/fulfillment.actions";
 export function FulfillmentControl({
   orderId,
   locale,
+  testMode = false,
 }: {
   orderId: string;
   locale: "en" | "zh";
+  testMode?: boolean;
 }) {
   const zh = locale === "zh";
   const router = useRouter();
@@ -46,6 +48,13 @@ export function FulfillmentControl({
         });
       }}
     >
+      {testMode && (
+        <p className="text-amber-700">
+          {zh
+            ? "测试／未核实订单：只验证后台流程，勿进行真实充值。"
+            : "Test / unverified order: simulate the workflow only; do not deliver real goods."}
+        </p>
+      )}
       <label className="block">
         {zh ? "处理结果" : "Delivery result"}
         <select name="status" className="block w-full rounded border p-2">

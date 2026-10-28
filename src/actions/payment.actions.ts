@@ -57,6 +57,11 @@ export const createCheckoutSession = actionClient
         merchant_id: product.games.merchant_id,
         amount,
         currency: "usd",
+        payment_mode: process.env.STRIPE_SECRET_KEY?.trim().startsWith(
+          "sk_test_",
+        )
+          ? "test"
+          : "live",
         status: "pending",
       })
       .select("id")
