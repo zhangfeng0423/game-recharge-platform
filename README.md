@@ -1,6 +1,10 @@
 # Game Recharge Platform
 
-A modern, multi-tenant game recharge platform built with Next.js 16, Supabase, and Stripe. This MVP provides a complete purchase flow for Players and role-gated dashboards for Merchants and Admins.
+A multi-tenant game recharge platform prototype built with Next.js 16, Supabase, and Stripe. This MVP provides a complete purchase flow for Players and role-gated dashboards for Merchants and Admins.
+
+## Current status
+
+This repository is a prototype. The sections below describe its intended workflows and implementation; production readiness, tenant isolation, payment fulfillment and the listed test coverage still require independent verification. The repository homepage lists a deployment, whose current behavior has not been validated in this documentation update.
 
 ## 🏗️ Architecture Overview
 
@@ -29,7 +33,7 @@ A modern, multi-tenant game recharge platform built with Next.js 16, Supabase, a
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js compatible with Next.js 16 (see `package.json`)
 - pnpm (recommended) or npm
 - Supabase project
 - Stripe account
@@ -38,7 +42,7 @@ A modern, multi-tenant game recharge platform built with Next.js 16, Supabase, a
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/zhangfeng0423/game-recharge-platform.git
 cd game-recharge-platform
 
 # Install dependencies
@@ -68,8 +72,7 @@ STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 
 # App Configuration
-NEXTAUTH_SECRET=your_nextauth_secret
-NEXTAUTH_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ### Database Setup
@@ -91,8 +94,8 @@ pnpm test:create
 # Start development server
 pnpm dev
 
-# Run in separate terminal for Stripe webhook testing
-pnpm stripe:listen
+# Run the separately installed Stripe CLI in another terminal
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the application.
@@ -185,7 +188,7 @@ pnpm test:watch
 pnpm e2e
 
 # Run specific test
-pnpm e2e -- grep "Purchase Flow"
+pnpm e2e:payment
 ```
 
 ### Testing Strategy
@@ -246,13 +249,13 @@ vercel --prod
 Ensure all variables from `.env.local` are configured in production:
 - Supabase URLs and keys
 - Stripe keys and webhook secret
-- NextAuth secret and URL
+- Application URL (`NEXT_PUBLIC_APP_URL`)
 
 ### Database Migration
 
 ```bash
 # Push schema changes to production
-pnpm supabase db push --remote production
+pnpm exec supabase db push  # after explicitly linking the intended project
 ```
 
 ## 🛠️ Development Workflow
@@ -267,7 +270,7 @@ pnpm lint
 pnpm typecheck
 
 # Run all quality checks
-pnpm check
+pnpm lint && pnpm typecheck && pnpm test
 ```
 
 ### Git Hooks
@@ -316,7 +319,7 @@ All business logic is implemented as Server Actions:
 ### API Routes
 
 - `/api/webhooks/stripe` - Stripe webhook handler
-- `/api/auth/[...nextauth]` - NextAuth endpoints
+- Authentication uses Supabase Auth; see `src/actions/auth.actions.ts`.
 
 ## 🐛 Troubleshooting
 
@@ -347,7 +350,7 @@ DEBUG=* pnpm dev
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+No LICENSE file is currently present in this repository. The maintainer needs to confirm the license; this README does not grant additional usage permissions.
 
 ## 🆘 Support
 
@@ -355,7 +358,7 @@ For support and questions:
 
 - Create an issue in the GitHub repository
 - Check the [documentation](./docs/)
-- Review the [troubleshooting guide](./docs/troubleshooting.md)
+- Review the troubleshooting section above
 
 ## 🔮 Roadmap
 
