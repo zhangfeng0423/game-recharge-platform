@@ -2,7 +2,7 @@ BEGIN;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_mode text NOT NULL DEFAULT 'unknown' CHECK(payment_mode IN ('unknown','test','live'));
 UPDATE public.orders SET payment_mode='test' WHERE payment_mode='unknown' AND stripe_checkout_session_id LIKE 'cs_test_%';
 UPDATE public.orders SET payment_mode='live' WHERE payment_mode='unknown' AND stripe_checkout_session_id LIKE 'cs_live_%';
-DROP FUNCTION public.apply_checkout_event(text,uuid,text,text,integer,text);
+DROP FUNCTION IF EXISTS public.apply_checkout_event(text,uuid,text,text,integer,text);
 CREATE OR REPLACE FUNCTION public.apply_checkout_event(
  p_event_id text,p_order_id uuid,p_session_id text,p_status text,p_amount integer,p_currency text,p_livemode boolean
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
