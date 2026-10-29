@@ -68,6 +68,18 @@ const orders = [
     sku,
   },
 ];
+const managedCodes = [
+  {
+    id: "60000000-0000-4000-8000-000000000001",
+    sku_id: ids.sku,
+    merchant_id: ids.merchant,
+    code: "NX-MANAGED-FIXTURE",
+    status: "active",
+    batch_note: "browser verification",
+    order_id: null,
+    created_at: time,
+  },
+];
 function token(user) {
   return [
     Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString(
@@ -125,6 +137,15 @@ http
         });
       }
       return json({ message: "INVALID_REDEEM_CODE" }, 400);
+    }
+    if (url.pathname === "/rest/v1/rpc/revoke_redeem_code") {
+      if (userFrom(req)?.role !== "MERCHANT")
+        return json({ message: "PERMISSION_DENIED" }, 403);
+      const code = managedCodes.find((c) => c.id === body.p_code_id);
+      if (!code || code.status !== "active")
+        return json({ message: "CODE_NOT_ACTIVE" }, 400);
+      code.status = "disabled";
+      return json(true);
     }
     if (url.pathname === "/auth/v1/recover") return json({});
     if (url.pathname === "/auth/v1/token") {
@@ -186,7 +207,9 @@ http
                 }))
               : table === "orders"
                 ? orders
-                : [];
+                : table === "redeem_codes"
+                  ? managedCodes
+                  : [];
       for (const [key, value] of url.searchParams) {
         if (!value.startsWith("eq.")) continue;
         if (key === "skus.is_published") {

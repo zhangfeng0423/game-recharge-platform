@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -8,17 +9,31 @@ import {
   saveGame,
   saveSku,
 } from "@/actions/merchant.actions";
-import { generateRedeemCodesAction } from "@/actions/redeem.actions";
+import {
+  generateRedeemCodesAction,
+  revokeRedeemCodeAction,
+} from "@/actions/redeem.actions";
 import type { GameWithSkus, Sku } from "@/lib/supabase-types";
 
 const inputClass =
   "mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
+export interface RedeemCodeSummary {
+  id: string;
+  sku_id: string;
+  code: string;
+  status: "active" | "redeemed" | "disabled";
+  batch_note: string | null;
+  order_id: string | null;
+}
+
 export function CatalogueEditor({
   games,
   locale,
+  redeemCodes = [],
 }: {
   games: GameWithSkus[];
+  redeemCodes?: RedeemCodeSummary[];
   locale: "en" | "zh";
 }) {
   const router = useRouter();
@@ -254,6 +269,9 @@ export function CatalogueEditor({
                   gameId={game.id}
                   locale={locale}
                   sku={sku}
+                  redeemCodes={redeemCodes.filter(
+                    (code) => code.sku_id === sku.id,
+                  )}
                   pending={pending}
                   perform={perform}
                 />
@@ -279,6 +297,7 @@ export function CatalogueEditor({
 }
 
 function SkuForm({
+  redeemCodes = [],
   gameId,
   locale,
   sku,
@@ -288,6 +307,7 @@ function SkuForm({
   gameId: string;
   locale: "en" | "zh";
   sku?: Sku;
+  redeemCodes?: RedeemCodeSummary[];
   pending: boolean;
   perform: (task: () => ReturnType<typeof saveSku>) => void;
 }) {
@@ -300,6 +320,8 @@ function SkuForm({
   const [genNote, setGenNote] = useState("");
   const [generatedCodes, setGeneratedCodes] = useState<string[]>([]);
   const [genPending, startGen] = useTransition();
+  const [codeMessage, setCodeMessage] = useState("");
+  const router = useRouter();
 
   const handleGenerateCodes = () => {
     if (!sku?.id) return;
@@ -313,6 +335,12 @@ function SkuForm({
         });
         if (res.data?.success && res.data.codes) {
           setGeneratedCodes(res.data.codes);
+          setCodeMessage(zh ? "生成成功。" : "Codes generated.");
+          router.refresh();
+        } else {
+          setCodeMessage(
+            zh ? "生成失败，请重试。" : "Unable to generate codes.",
+          );
         }
       } catch {
         alert(zh ? "生成失败，请重试" : "Generation failed");
@@ -571,6 +599,96 @@ function SkuForm({
                   ? "开始生成"
                   : "Generate"}
             </button>
+          </div>
+
+          <p aria-live="polite" className="text-sm">
+            {codeMessage}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <caption className="py-2 text-left">
+                {zh
+                  ? "已保存的兑换码（店铺最近 200 条）"
+                  : "Saved codes (latest 200 for this store)"}
+              </caption>
+              <thead>
+                <tr>
+                  <th>{zh ? "兑换码" : "Code"}</th>
+                  <th>{zh ? "批次" : "Batch"}</th>
+                  <th>{zh ? "状态" : "Status"}</th>
+                  <th>{zh ? "操作" : "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {redeemCodes.map((code) => (
+                  <tr key={code.id} className="border-t">
+                    <td className="py-2 font-mono select-all">{code.code}</td>
+                    <td>{code.batch_note || "—"}</td>
+                    <td>
+                      {zh
+                        ? {
+                            active: "未使用",
+                            redeemed: "已核销",
+                            disabled: "已作废",
+                          }[code.status]
+                        : code.status}
+                    </td>
+                    <td>
+                      {code.status === "active" && (
+                        <button
+                          type="button"
+                          disabled={genPending}
+                          className="text-red-600 disabled:opacity-50"
+                          onClick={() =>
+                            startGen(async () => {
+                              try {
+                                const result = await revokeRedeemCodeAction({
+                                  codeId: code.id,
+                                });
+                                if (!result.data?.success) {
+                                  setCodeMessage(
+                                    zh
+                                      ? "作废失败，请刷新后重试。"
+                                      : "Unable to revoke code. Refresh and retry.",
+                                  );
+                                  return;
+                                }
+                                setGeneratedCodes((codes) =>
+                                  codes.filter((value) => value !== code.code),
+                                );
+                                setCodeMessage(
+                                  zh ? "兑换码已作废。" : "Code revoked.",
+                                );
+                                router.refresh();
+                              } catch {
+                                setCodeMessage(
+                                  zh
+                                    ? "作废失败，请重试。"
+                                    : "Unable to revoke code.",
+                                );
+                              }
+                            })
+                          }
+                        >
+                          {zh ? "作废" : "Revoke"}
+                        </button>
+                      )}
+                      {code.order_id && (
+                        <Link
+                          href={`/${locale}/orders/${code.order_id}`}
+                          className="text-blue-600"
+                        >
+                          {zh ? "查看订单" : "View order"}
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {redeemCodes.length === 0 && (
+              <p>{zh ? "暂无兑换码。" : "No codes yet."}</p>
+            )}
           </div>
 
           {generatedCodes.length > 0 && (

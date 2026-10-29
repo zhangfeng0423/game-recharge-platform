@@ -1,4 +1,7 @@
-import { CatalogueEditor } from "@/components/features/merchant/catalogue-editor";
+import {
+  CatalogueEditor,
+  type RedeemCodeSummary,
+} from "@/components/features/merchant/catalogue-editor";
 import { requireUser } from "@/lib/portal";
 import type { GameWithSkus } from "@/lib/supabase-types";
 import { createSupabaseServerClientWithCookies } from "@/lib/supabaseServer";
@@ -10,12 +13,20 @@ export default async function MerchantGames({
   const { locale } = await params;
   const user = await requireUser(locale, true);
   const db = await createSupabaseServerClientWithCookies();
-  const { data, error } = await db
-    .from("games")
-    .select("*,skus(*,sku_fulfillment_secrets(content))")
-    .eq("merchant_id", user.id)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error("Unable to load products");
+  const [{ data, error }, codes] = await Promise.all([
+    db
+      .from("games")
+      .select("*,skus(*,sku_fulfillment_secrets(content))")
+      .eq("merchant_id", user.id)
+      .order("created_at", { ascending: false }),
+    db
+      .from("redeem_codes")
+      .select("id,sku_id,code,status,batch_note,order_id")
+      .eq("merchant_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
+  if (error || codes.error) throw new Error("Unable to load products or codes");
 
   const formattedGames = ((data as any[]) || []).map((g) => ({
     ...g,
@@ -33,6 +44,7 @@ export default async function MerchantGames({
   return (
     <CatalogueEditor
       games={formattedGames as unknown as GameWithSkus[]}
+      redeemCodes={(codes.data || []) as RedeemCodeSummary[]}
       locale={locale as "en" | "zh"}
     />
   );

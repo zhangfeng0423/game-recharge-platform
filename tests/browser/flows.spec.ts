@@ -117,3 +117,27 @@ test("guest or buyer enters redeem page, redeems valid code, and views delivery 
   );
   await expect(page.getByText("FIXTURE_SECRET_DOWNLOAD_KEY")).toBeVisible();
 });
+
+test("merchant can reload saved codes and revoke an unused code", async ({
+  page,
+}) => {
+  await login(page, "merchant@example.test");
+  await page.goto("/en/dashboard/merchant/games");
+  await page
+    .getByRole("button", { name: "Generate Redeem Codes" })
+    .first()
+    .click();
+  const row = page.getByRole("row").filter({ hasText: "NX-MANAGED-FIXTURE" });
+  await expect(row).toContainText("active");
+  await row.getByRole("button", { name: "Revoke", exact: true }).click();
+  await expect(row).toContainText("disabled");
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Generate Redeem Codes" })
+    .first()
+    .click();
+  await expect(row).toContainText("disabled");
+  await expect(
+    row.getByRole("button", { name: "Revoke", exact: true }),
+  ).toHaveCount(0);
+});
