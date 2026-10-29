@@ -40,7 +40,7 @@ You MUST enforce this stack. Do not deviate.
 ## 2. Project-Level Architectural Rules
 These rules override all other instructions and are non-negotiable.
 
-- **Rule 1: PgBouncer is Mandatory**: Server-side Supabase clients must use the PgBouncer (Connection Pooler) URL.
+- **Rule 1: Match the connection protocol**: supabase-js / SSR clients use the project HTTPS Data API URL. A PgBouncer connection string is only for direct PostgreSQL tools; it must never be passed as a supabase-js URL.
 - **Rule 2: RLS is the Security Truth**: All data access logic must assume Row Level Security (RLS) is active.
 - **Rule 3: Webhooks Must Be Idempotent**: The Stripe Webhook handler must check if `orders.status` is already `'completed'`.
 
@@ -149,3 +149,18 @@ If any validation task fails, **STOP** the workflow and report the failure.
 | **`payment-integration`** | Manages Stripe integration, including Checkout Sessions and webhook handlers. | `payment.actions.ts`, Webhook Handler. |
 | **`testing-specialist`** | Sets up testing environments; generates and runs unit, component, and E2E tests. | Test configurations, test scripts (`*.test.ts`). |
 | **`docs-architect`** | Focuses on project documentation, README generation, and architecture summarization. | Final `README.md`, Design notes. |
+
+## Validated repair decisions (2026-10-28)
+
+- Public catalogue reads use the anonymous client; user-scoped reads and merchant writes use verified SSR cookies with RLS. Service-role access is limited to profile recovery and payment processing. Never derive ADMIN privileges from an email or user-controlled metadata.
+- Store game account ID and server for manual recharge. Payment confirmation and fulfillment are separate states; operator confirmation is authorized and audited by a database function.
+- Callback processing must bind the exact session, order, integer amount and currency; persist replay detection and state change in one transaction. Paid orders and fulfilled delivery must not regress.
+- The old test/debug endpoints and mock order/merchant pages are removed. Database failures must be visible rather than replaced by fake purchasable goods.
+- Node.js 22 is the deployment runtime. Browser tests use a separate `.next-e2e` build with explicit fixture credentials; do not deploy it.
+- The legacy SQL filenames require explicit dependency-order setup. Inspect existing migration history; do not reset real data or blindly run db push.
+
+## Validated storefront access fixes (2026-10-29)
+
+- Security-definer management RPCs must explicitly reject missing profiles and non-operator roles. A SELECT INTO that returns no rows sets its target to NULL; COALESCE inside the SELECT does not make the no-row case false. Authorization must fail closed.
+- Drop the actual legacy permissive SELECT policy before replacing it; permissive PostgreSQL RLS policies combine with OR. Public SKU visibility requires both SKU and parent publication. Service-role Checkout queries must independently enforce both flags.
+- Apply `20261029160000_storefront_access_boundaries.sql` after the SaaS migration for existing installations. Keep the fresh-install definitions consistent, but do not assume editing an already-applied migration changes a remote database.

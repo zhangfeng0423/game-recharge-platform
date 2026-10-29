@@ -1,0 +1,161 @@
+import Link from "next/link";
+import { formatDate, formatPrice } from "@/lib/utils";
+import { FulfillmentControl } from "./fulfillment-control";
+export interface PortalOrder {
+  payment_mode?: "test" | "live" | "unknown" | "redeem";
+  player_account?: string | null;
+  game_server?: string | null;
+  fulfillment_status?: string;
+  fulfillment_note?: string | null;
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_at: string;
+  sku: {
+    name: { en: string; zh: string };
+    game?: { name: { en: string; zh: string } };
+  } | null;
+}
+export function OrderTable({
+  orders,
+  locale,
+  manage = false,
+}: {
+  orders: PortalOrder[];
+  locale: string;
+  manage?: boolean;
+}) {
+  const zh = locale === "zh";
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr>
+            {(zh
+              ? [
+                  "订单号",
+                  "商品",
+                  "金额",
+                  "支付状态",
+                  "日期",
+                  "玩家 ID／区服",
+                  "交付状态",
+                ]
+              : [
+                  "Order",
+                  "Product",
+                  "Amount",
+                  "Payment status",
+                  "Date",
+                  "Player / server",
+                  "Delivery status",
+                ]
+            ).map((x) => (
+              <th key={x} className="border-b p-3">
+                {x}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr key={o.id}>
+              <td className="border-b p-3 font-mono">
+                <Link
+                  href={`/${locale}/orders/${o.id}`}
+                  className="text-blue-600 hover:underline"
+                >
+                  {o.id}
+                </Link>
+              </td>
+              <td className="border-b p-3">
+                {o.sku?.name[zh ? "zh" : "en"] ?? "—"}
+              </td>
+              <td className="border-b p-3">
+                {o.payment_mode === "redeem"
+                  ? zh
+                    ? "卡密兑换"
+                    : "Redeemed"
+                  : formatPrice(o.amount, o.currency, locale)}
+              </td>
+              <td className="border-b p-3">
+                <p>
+                  {o.payment_mode === "redeem"
+                    ? zh
+                      ? "卡密核销成功"
+                      : "Code Redeemed"
+                    : o.status === "completed"
+                      ? zh
+                        ? "已收款"
+                        : "Paid"
+                      : o.status === "failed"
+                        ? zh
+                          ? "已失效／失败"
+                          : "Expired / failed"
+                        : zh
+                          ? "待支付确认"
+                          : "Awaiting payment confirmation"}
+                </p>
+                {o.payment_mode === "test" && (
+                  <p className="text-amber-700 text-xs">
+                    {zh
+                      ? "测试订单，勿实际充值"
+                      : "Test order — do not deliver real goods"}
+                  </p>
+                )}
+                {o.payment_mode === "unknown" && (
+                  <p className="text-amber-700 text-xs">
+                    {zh
+                      ? "历史支付需核实"
+                      : "Historical payment needs verification"}
+                  </p>
+                )}
+              </td>
+              <td className="border-b p-3">
+                {formatDate(o.created_at, locale)}
+              </td>
+              <td className="border-b p-3">
+                {o.player_account ?? "—"} / {o.game_server ?? "—"}
+              </td>
+              <td className="border-b p-3">
+                <p>
+                  {o.fulfillment_status === "fulfilled"
+                    ? zh
+                      ? "充值已完成"
+                      : "Delivered"
+                    : o.fulfillment_status === "attention"
+                      ? zh
+                        ? "需跟进"
+                        : "Needs follow-up"
+                      : zh
+                        ? "待人工充值"
+                        : "Awaiting manual recharge"}
+                </p>
+                {o.fulfillment_note && <p>{o.fulfillment_note}</p>}
+                {manage &&
+                  o.status === "completed" &&
+                  o.fulfillment_status !== "fulfilled" && (
+                    <FulfillmentControl
+                      testMode={o.payment_mode !== "live"}
+                      orderId={o.id}
+                      locale={locale as "en" | "zh"}
+                    />
+                  )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {orders.length === 0 && (
+        <p className="py-8">{zh ? "暂无订单。" : "No orders yet."}</p>
+      )}
+      <p className="py-4 text-sm text-slate-500">
+        {zh
+          ? "已收款仅表示支付已确认，游戏内充值交付需另行确认。"
+          : "Paid means payment confirmed. In-game delivery must be confirmed separately."}
+      </p>
+      <Link href={`/${locale}`}>{zh ? "返回首页" : "Back to store"}</Link>
+    </div>
+  );
+}

@@ -34,6 +34,9 @@ export interface Game extends BaseTimestamps {
   description?: GameDescription | null; // JSONB: {"en": "Description", "zh": "描述"}
   banner_url?: string | null;
   merchant_id: string; // UUID, references profiles.id
+  is_published?: boolean;
+  sort_order?: number;
+  category?: string;
 }
 
 export interface Sku extends BaseTimestamps {
@@ -43,17 +46,55 @@ export interface Sku extends BaseTimestamps {
   prices: SkuPrices; // JSONB: {"usd": 1099, "eur": 999}
   image_url?: string | null;
   game_id: string; // UUID, references games.id
+  delivery_mode?: "auto" | "manual" | "showcase";
+  auto_delivery_content?: string | null; // UI helper / merchant secret mirror
+  external_url?: string | null;
+  requires_recipient_info?: boolean;
+  recipient_label?: { en: string; zh: string } | null;
+  sku_fulfillment_secrets?: { content: string }[] | { content: string } | null;
+}
+
+export interface SkuFulfillmentSecret {
+  sku_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Order extends BaseTimestamps {
+  payment_mode?: "test" | "live" | "unknown" | "redeem";
+  player_account?: string | null;
+  game_server?: string | null;
+  fulfillment_status?: "pending" | "fulfilled" | "attention";
+  fulfilled_at?: string | null;
+  fulfilled_by?: string | null;
+  fulfillment_note?: string | null;
   id: string; // UUID
-  user_id: string; // UUID, references profiles.id
+  user_id?: string | null; // UUID, references profiles.id (optional for guest orders)
+  buyer_email?: string | null;
+  access_token?: string;
+  redeem_code_id?: string | null;
   sku_id: string; // UUID, references skus.id
   merchant_id: string; // UUID, references profiles.id
   amount: number; // Integer amount in cents (e.g., 1099 = $10.99)
   currency: string; // V1 always "usd"
   status: "pending" | "completed" | "failed";
   stripe_checkout_session_id?: string | null;
+}
+
+export interface RedeemCode extends BaseTimestamps {
+  id: string;
+  code: string;
+  sku_id: string;
+  merchant_id: string;
+  batch_note?: string | null;
+  custom_delivery_content?: string | null;
+  status: "active" | "redeemed" | "disabled";
+  redeemed_by_user_id?: string | null;
+  redeemed_by_email?: string | null;
+  order_id?: string | null;
+  expires_at?: string | null;
+  redeemed_at?: string | null;
 }
 
 // =============================================================================
@@ -256,48 +297,124 @@ export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: Profile;
+        Row: Profile & Record<string, unknown>;
         Insert: Omit<Profile, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Profile>;
+        Relationships: [];
       };
       games: {
-        Row: Game;
+        Row: Game & Record<string, unknown>;
         Insert: Omit<Game, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Game>;
+        Relationships: [];
       };
       skus: {
-        Row: Sku;
+        Row: Sku & Record<string, unknown>;
         Insert: Omit<Sku, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Sku>;
+        Relationships: [];
       };
       orders: {
-        Row: Order;
+        Row: Order & Record<string, unknown>;
         Insert: Omit<Order, "id" | "created_at" | "updated_at"> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Order>;
+        Relationships: [];
+      };
+      redeem_codes: {
+        Row: RedeemCode & Record<string, unknown>;
+        Insert: Omit<RedeemCode, "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<RedeemCode>;
+        Relationships: [];
+      };
+      sku_fulfillment_secrets: {
+        Row: SkuFulfillmentSecret & Record<string, unknown>;
+        Insert: {
+          sku_id: string;
+          content: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<SkuFulfillmentSecret>;
+        Relationships: [];
       };
     };
     Views: {
       merchant_analytics: {
-        Row: MerchantAnalytics;
+        Row: MerchantAnalytics & Record<string, unknown>;
+        Relationships: [];
       };
     };
     Functions: {
+      save_sku_with_secret: {
+        Args: {
+          p_id?: string | null;
+          p_game_id: string;
+          p_name: Json;
+          p_description: Json;
+          p_prices: Json;
+          p_image_url?: string | null;
+          p_delivery_mode: string;
+          p_external_url?: string | null;
+          p_requires_recipient_info: boolean;
+          p_recipient_label: Json;
+          p_is_published: boolean;
+          p_secret_content?: string | null;
+        };
+        Returns: string;
+      };
+      revoke_redeem_code: {
+        Args: {
+          p_code_id: string;
+        };
+        Returns: boolean;
+      };
+      redeem_product_code: {
+        Args: {
+          p_code: string;
+          p_sku_id?: string | null;
+          p_user_id?: string | null;
+          p_buyer_email?: string | null;
+          p_player_account?: string | null;
+          p_game_server?: string | null;
+        };
+        Returns: Json;
+      };
+      set_order_fulfillment: {
+        Args: { p_order_id: string; p_status: string; p_note: string };
+        Returns: undefined;
+      };
+      apply_checkout_event: {
+        Args: {
+          p_event_id: string;
+          p_order_id: string;
+          p_session_id: string;
+          p_status: string;
+          p_amount: number;
+          p_currency: string;
+          p_livemode: boolean;
+        };
+        Returns: undefined;
+      };
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

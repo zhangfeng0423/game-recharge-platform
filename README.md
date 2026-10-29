@@ -1,380 +1,116 @@
 # Game Recharge Platform
 
-A modern, multi-tenant game recharge platform built with Next.js 16, Supabase, and Stripe. This MVP provides a complete purchase flow for Players and role-gated dashboards for Merchants and Admins.
+A Next.js storefront for USD game top-ups, with Supabase accounts, Stripe Checkout, merchant product management, and **manual recharge fulfillment**.
 
-## 🏗️ Architecture Overview
+游戏充值平台：玩家填写游戏 ID 和区服，付款后由经营者人工充值，再在后台确认交付。**已收款和已充值是两个独立状态。**
 
-### Core Technologies
+## Current scope
 
-- **Framework**: Next.js 16 with App Router and React Server Components (RSC)
-- **Database**: PostgreSQL via Supabase with Row Level Security (RLS)
-- **Authentication**: Supabase Auth with Google OAuth
-- **Payment**: Stripe Checkout with Webhook integration
-- **Styling**: Tailwind CSS 4 with Radix UI components
-- **Language**: TypeScript 5 with end-to-end type safety
-- **Testing**: Vitest + React Testing Library + Playwright
-- **Internationalization**: next-intl (English/Chinese)
+- English / Chinese catalogue, game details and accessible product dialogs.
+- Email/password accounts, email password recovery, and Google OAuth callback support (requires provider setup).
+- Player order history, scoped to the signed-in buyer.
+- Merchant game / SKU create, edit and delete, scoped to the signed-in merchant. Products referenced by orders cannot be deleted.
+- Merchant order queue and an admin overview of accounts and orders.
+- Stripe-hosted Checkout; prices and merchant ownership are taken from the database.
+- Signed, transactional payment callbacks with amount / currency / session matching, replay protection and no paid-to-failed regression.
+- Manual delivery status and a buyer-visible delivery note, with an audit event identifying the operator.
 
-### Key Features
+This is a repair of an earlier prototype. Passing the local checks below is **not** proof that a particular Supabase / Stripe deployment is ready. Actual service configuration and a test payment must be checked before accepting money.
 
-- **Multi-tenant Architecture**: Strict data isolation between merchants
-- **Role-based Access Control**: User, Merchant, and Admin roles
-- **Complete Purchase Flow**: From product selection to payment confirmation
-- **Real-time Updates**: Live order status and inventory management
-- **Multi-language Support**: Full internationalization with dynamic routing
-- **Secure Payment Processing**: Stripe integration with idempotency guarantees
-- **Responsive Design**: Mobile-first approach with accessibility in mind
+## Run locally
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- pnpm (recommended) or npm
-- Supabase project
-- Stripe account
-
-### Installation
+Use Node.js 22 and the pnpm version specified in `package.json`.
 
 ```bash
-# Clone the repository
-git clone <repository-url>
+git clone https://github.com/zhangfeng0423/game-recharge-platform.git
 cd game-recharge-platform
-
-# Install dependencies
-pnpm install
-
-# Copy environment variables
+pnpm install --frozen-lockfile
 cp .env.example .env.local
-
-# Configure your environment variables
-# See Environment Configuration section below
-```
-
-### Environment Configuration
-
-Create `.env.local` with the following variables:
-
-```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-SUPABASE_DATABASE_URL=your_database_url_with_pgbouncer
-
-# Stripe Configuration
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
-STRIPE_SECRET_KEY=your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-
-# App Configuration
-NEXTAUTH_SECRET=your_nextauth_secret
-NEXTAUTH_URL=http://localhost:3000
-```
-
-### Database Setup
-
-```bash
-# Run database migrations
-pnpm supabase db push
-
-# Create initial admin user
-pnpm admin:create
-
-# (Optional) Create test data
-pnpm test:create
-```
-
-### Development
-
-```bash
-# Start development server
+# Fill in your own Supabase project and Stripe test credentials.
 pnpm dev
-
-# Run in separate terminal for Stripe webhook testing
-pnpm stripe:listen
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+Open http://localhost:3000/en or http://localhost:3000/zh . Never commit `.env.local` or real credentials.
 
-## 📁 Project Structure
+### Database setup
 
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── [locale]/          # Internationalized routes
-│   │   ├── page.tsx       # Homepage (game listing)
-│   │   ├── auth/          # Authentication pages
-│   │   ├── games/[gameId]/ # Game details pages
-│   │   ├── dashboard/     # Merchant/Admin dashboards
-│   │   └── payment/       # Payment flow pages
-│   └── api/               # API routes
-│       └── webhooks/      # Stripe webhook handler
-├── components/
-│   ├── ui/               # Reusable UI components (Radix-based)
-│   └── features/         # Business logic components
-├── actions/              # Next.js Server Actions
-├── lib/                  # Core utilities and configurations
-├── stores/               # Zustand state management
-├── i18n/                 # Internationalization configuration
-└── types/                # TypeScript type definitions
-```
+Back up an existing database and inspect its migration history and schema first. Do not reset a database containing real accounts or orders.
 
-## 🎮 User Roles & Access Control
+For a **fresh** Supabase project, run these SQL files in the SQL editor in this exact dependency order:
 
-### Players (USER)
-- Browse games and purchase SKUs
-- View order history
-- Manage profile information
+1. `supabase/migrations/20250109_001_initial_schema.sql`
+2. `supabase/migrations/9999_merchant_analytics_rpc.sql`
+3. `supabase/migrations/20261028160000_launch_hardening.sql`
+4. `supabase/migrations/20261028170000_manual_fulfillment.sql`
+5. `supabase/migrations/20261028180000_payment_mode.sql`
+6. `supabase/migrations/20261029000000_saas_storefront_and_redeem.sql`
+7. `supabase/migrations/20261029160000_storefront_access_boundaries.sql`
 
-### Merchants (MERCHANT)
-- Manage own games and SKUs
-- View sales analytics and orders
-- **Strict Data Tenancy**: Can only access their own data
+For a project that already has the two legacy schemas, inspect compatibility and apply only the missing migrations in the order above. If a previous draft of the SaaS migration was already applied, inspect its schema compatibility first and apply the access-boundaries migration as a separate upgrade; editing an applied file does not upgrade the remote database. The legacy filenames do not form a standard timestamp sequence: **do not blindly run `supabase db push`**. Reconcile migration history before adopting automated migrations.
 
-### Administrators (ADMIN)
-- Full platform oversight
-- User management
-- Cross-merchant analytics
+The hardening migration removes direct client writes to financial orders and role assignments, restricts legacy analytics access, creates profiles within account-creation transactions, and adds an atomic payment-event function. The fulfillment migration adds recipient details, a separate delivery lifecycle, and an operator-scoped confirmation function.
 
-## 💳 Payment Flow
+### Account setup
 
-1. **Product Selection**: User selects a game SKU
-2. **Order Creation**: Server creates pending order with Stripe Checkout Session
-3. **Payment Processing**: User completes payment via Stripe Checkout
-4. **Webhook Verification**: Stripe sends payment confirmation to webhook endpoint
-5. **Order Fulfillment**: System updates order status and processes fulfillment
+- Configure Supabase Site URL and redirect allowlists for the actual application origins.
+- Email confirmation and production email delivery require working Supabase email settings.
+- Password recovery starts at `/<locale>/auth/forgot`. Allow the exact callback URL `https://YOUR_HOST/<locale>/auth/callback?next=%2F<locale>%2Fauth%2Freset` for each supported locale. Set the Supabase **Reset password** email body to `supabase/templates/recovery.html`. This template is designed for recovery requests from this app: `redirectTo` already includes the `next` query parameter. It links directly to the app callback with `TokenHash`; the server verifies the one-time token with Supabase and redirects to a clean reset URL. This avoids requiring browsers to connect directly to the Supabase project domain. A verified session is required before setting a new password. The default ConfirmationURL / PKCE flow is also supported, but requires the same browser that requested it.
+- Configure Google OAuth separately if you want to offer Google sign-in. Its callback is `/<locale>/auth/callback`.
+- Public registration creates a USER. Merchant and ADMIN roles require trusted operator administration. **ADMIN is never inferred from an email address or signup metadata.** Set the initial operator's profile role through trusted database administration after verifying the account.
+- Audit existing ADMIN profiles from the old application before launch: earlier code inferred privilege from email text.
 
-### Security Features
+## Payments and manual fulfillment
 
-- **Idempotency**: Webhook processing checks for duplicate orders
-- **Signature Verification**: All webhook signatures are verified
-- **Error Handling**: Comprehensive error handling with user-friendly messages
-- **Data Validation**: All inputs validated using Zod schemas
+Checkout is closed by default. Set `PAYMENTS_ENABLED=true` only after the database migrations, correct public origin, valid Stripe test key and webhook secret are present. Live keys additionally require `ALLOW_LIVE_PAYMENTS=true`.
 
-## 🌍 Internationalization
+Register `/api/webhooks/stripe` in Stripe and subscribe to:
 
-The platform supports multiple languages with dynamic routing:
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.expired`
 
-- **English**: `/en/...` (default)
-- **Chinese**: `/zh/...`
+Use the matching endpoint signing secret in `STRIPE_WEBHOOK_SECRET`. An unconfigured webhook returns 503; invalid signatures return 400; persistence failures return 500 so Stripe can retry.
 
-### Adding New Languages
+### Operator workflow
 
-1. Add translation files in `messages/` directory
-2. Update `src/i18n/config.ts` with new locale
-3. Run `pnpm lint` to ensure consistency
+1. Publish real game / SKU descriptions and USD prices through the merchant catalogue editor. Do not advertise unverified bonuses or automatic delivery.
+2. The player supplies a game account ID and server. **Never request account passwords.**
+3. Stripe confirms payment. A redirect to the return page alone does not mark the order paid.
+4. In the merchant order queue (or admin overview), locate a paid, undelivered order and verify its account / server.
+5. Perform the recharge outside this application.
+6. Record the verified outcome and a buyer-visible delivery reference. Delivery confirmation records the operator and timestamp. A different merchant cannot update the order.
+7. If recharge cannot be delivered, mark it for follow-up and resolve it with the buyer. Refunds and chargebacks require separate handling in Stripe; this application does not issue refunds or automatically settle funds to merchants.
 
-## 🧪 Testing
+Test orders are explicitly labeled. Their callbacks must carry test mode; they must never trigger a real game recharge. Historical orders with unknown mode require verification.
 
-### Unit & Integration Tests
-```bash
-# Run all tests
-pnpm test
+An order's `completed` payment status means **paid**, not delivered. Fulfillment uses `pending`, `attention` and `fulfilled` separately. Financial history is retained when product deletion is attempted.
 
-# Run with coverage
-pnpm test:coverage
-
-# Watch mode
-pnpm test:watch
-```
-
-### E2E Tests
-```bash
-# Run Playwright tests
-pnpm e2e
-
-# Run specific test
-pnpm e2e -- grep "Purchase Flow"
-```
-
-### Testing Strategy
-
-- **Server Actions**: Tested with Vitest
-- **Components**: Tested with React Testing Library
-- **Payment Flow**: End-to-end testing with Stripe test mode
-- **RLS Policies**: Database policy testing
-- **Authentication**: Full auth flow testing
-
-## 🔒 Security Architecture
-
-### Row Level Security (RLS)
-- All database tables implement RLS policies
-- Merchants can only access their own data
-- Role-based access control enforced at database level
-
-### Server Actions Security
-- All actions use `next-safe-action` with Zod validation
-- Input sanitization and type checking
-- Rate limiting and error handling
-
-### Payment Security
-- PCI compliance through Stripe integration
-- Webhook signature verification
-- No sensitive data stored in client-side code
-
-## 📊 Analytics & Monitoring
-
-### Merchant Dashboard
-- Sales overview with charts
-- Order history and status tracking
-- Revenue analytics by game and SKU
-- Customer insights
-
-### Admin Dashboard
-- Platform-wide metrics
-- Merchant management
-- Financial reporting
-- System health monitoring
-
-## 🚀 Deployment
-
-### Vercel (Recommended)
+## Verification
 
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy to Vercel
-vercel --prod
-
-# Set environment variables in Vercel dashboard
-```
-
-### Environment Variables
-
-Ensure all variables from `.env.local` are configured in production:
-- Supabase URLs and keys
-- Stripe keys and webhook secret
-- NextAuth secret and URL
-
-### Database Migration
-
-```bash
-# Push schema changes to production
-pnpm supabase db push --remote production
-```
-
-## 🛠️ Development Workflow
-
-### Code Quality
-
-```bash
-# Lint and format code
 pnpm lint
-
-# Type checking
 pnpm typecheck
-
-# Run all quality checks
-pnpm check
+pnpm test
+pnpm build
+pnpm exec playwright install chromium
+pnpm e2e
 ```
 
-### Git Hooks
+- Unit / integration tests check verified identity, buyer order scoping, real PostgreSQL RLS, signed callback handling, replay protection, and manual-fulfillment permissions.
+- Database tests run the actual SQL against isolated PGlite PostgreSQL, with a minimal Supabase auth schema. They do not alter a remote database.
+- Browser tests start a production build against an isolated HTTP fixture for Supabase. They check catalogue, language, login, role redirects, order pages and closed checkout. Fixture builds use `.next-e2e`, separate from deployable `.next` output. They do not prove delivery of real email, OAuth configuration or live payment processing.
+- `pnpm audit --prod --registry=https://registry.npmjs.org` checks current runtime dependency advisories.
 
-Pre-commit hooks run automatically:
-- Biome formatting and linting
-- Type checking
-- Test execution on affected files
+## Deploy with Vercel
 
-### Adding New Features
+The repository targets Node.js 22, `pnpm install --frozen-lockfile` and `pnpm build`. Configure environment variables on the intended project and environment; preview and production signing secrets / callback origins must match their respective endpoints.
 
-1. Create feature branch from `main`
-2. Implement Server Actions in `src/actions/`
-3. Create components in `src/components/features/`
-4. Add tests in appropriate test directories
-5. Update internationalization files
-6. Run full test suite before PR
+Before accepting real payments, verify a complete test-mode purchase in the actual deployment: signup / email confirmation → login → merchant product → checkout → signed callback → buyer order → operator delivery confirmation. Also verify a second merchant cannot access or update the order.
 
-## 🤝 Contributing
+Set the correct origin at build time: `NEXT_PUBLIC_*` variables are embedded in the Next.js build. Changing their values requires a new build. Do not promote a fixture build or a preview configured for another database.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## License and feedback
 
-### Development Guidelines
+No LICENSE file has been selected for this repository. This README does not grant additional permissions.
 
-- Follow TypeScript strict mode conventions
-- Use RSCs by default, minimize `"use client"`
-- Implement proper error boundaries
-- Add comprehensive tests for new features
-- Update documentation for API changes
-
-## 📚 API Documentation
-
-### Server Actions
-
-All business logic is implemented as Server Actions:
-
-- `auth.actions.ts` - Authentication operations
-- `games.actions.ts` - Game and SKU management
-- `payment.actions.ts` - Payment processing
-- `order.actions.ts` - Order management
-
-### API Routes
-
-- `/api/webhooks/stripe` - Stripe webhook handler
-- `/api/auth/[...nextauth]` - NextAuth endpoints
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Stripe Webhook Not Working**
-- Ensure webhook secret is correctly configured
-- Check that Stripe CLI is running in development
-- Verify webhook endpoint is accessible
-
-**Database Connection Issues**
-- Check Supabase configuration in `.env.local`
-- Ensure PgBouncer URL is used for server-side clients
-- Verify RLS policies are correctly implemented
-
-**Authentication Problems**
-- Check Supabase Auth configuration
-- Ensure redirect URLs are configured in Supabase dashboard
-- Verify NextAuth secret is set
-
-### Debug Mode
-
-Enable debug logging:
-```bash
-# Run with debug logging
-DEBUG=* pnpm dev
-```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-For support and questions:
-
-- Create an issue in the GitHub repository
-- Check the [documentation](./docs/)
-- Review the [troubleshooting guide](./docs/troubleshooting.md)
-
-## 🔮 Roadmap
-
-### Upcoming Features
-
-- **Mobile App**: React Native implementation
-- **Advanced Analytics**: Real-time dashboard updates
-- **Multi-currency Support**: Extended currency handling
-- **Subscription Management**: Recurring payment options
-- **Third-party Integrations**: Game platform APIs
-- **Advanced Fraud Detection**: Machine learning-based security
-
-### Technical Improvements
-
-- **Microservices Migration**: Service-oriented architecture
-- **Caching Layer**: Redis integration for performance
-- **CDN Optimization**: Global content delivery
-- **Database Sharding**: Horizontal scaling capabilities
-
----
-
-Built with ❤️ using modern web technologies and best practices.
+Report reproducible problems via [Issues](https://github.com/zhangfeng0423/game-recharge-platform/issues). Do not include credentials, player identifiers or private order data in public issues.

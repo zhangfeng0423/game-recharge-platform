@@ -148,7 +148,8 @@
     "category": "Category",
     "merchant": "Merchant",
     "description": "Description",
-    "noItemsAvailable": "No items available"
+    "noItemsAvailable": "No items available",
+    "noImage": "No Image"
   },
   "purchase": {
     "price": "Price",

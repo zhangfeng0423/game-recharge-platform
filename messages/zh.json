@@ -149,7 +149,8 @@
     "category": "分类",
     "merchant": "商家",
     "description": "描述",
-    "noItemsAvailable": "暂无可用物品"
+    "noItemsAvailable": "暂无可用物品",
+    "noImage": "暂无图片"
   },
   "purchase": {
     "price": "价格",

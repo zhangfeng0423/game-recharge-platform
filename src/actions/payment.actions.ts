@@ -1,337 +1,175 @@
 "use server";
-
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSafeActionClient } from "next-safe-action";
-import Stripe from "stripe";
 import { z } from "zod";
-import type { Database } from "@/lib/supabase-types";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { actionClient } from "@/lib/action-client";
+import { getAppOrigin } from "@/lib/app-origin";
+import { getStripe } from "@/lib/stripe";
+import { createSupabaseAdminClient } from "@/lib/supabaseServer";
 import { getCurrentUser } from "./auth.actions";
-
-// Initialize Stripe with enhanced configuration
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY is not set in environment variables");
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20" as any,
-  typescript: true,
-  telemetry: false, // Disable Stripe telemetry for better privacy
-});
-
-// Constants for error handling and validation
-const MINIMUM_AMOUNT_CENTS = 50; // $0.50 minimum
-const MAXIMUM_AMOUNT_CENTS = 999999; // $9,999.99 maximum
-const _SUPPORTED_CURRENCIES = ["usd"]; // V1 is USD only as per PRD
-
-// Create the action client
-const actionClient = createSafeActionClient({
-  handleServerError: (e: unknown) => {
-    console.error("Action Error:", e);
-    return {
-      serverError: "An unexpected error occurred.",
-    };
-  },
-});
-
-// Enhanced validation schema with security checks
-const checkoutSchema = z.object({
-  skuId: z.string().min(1, "SKU ID is required"),
-  locale: z.enum(["en", "zh"]),
-});
-
-// Action result
-export interface CheckoutResult {
-  success: boolean;
-  message: string;
-  checkoutUrl?: string;
-}
-
-// Helper function for logging payment events
-function logPaymentEvent(
-  level: "info" | "warn" | "error",
-  message: string,
-  data?: any,
-) {
-  const timestamp = new Date().toISOString();
-  console[level](
-    `[PAYMENT] ${timestamp} - ${message}`,
-    data ? JSON.stringify(data, null, 2) : "",
-  );
-}
-
-// Helper function to validate price
-function validatePrice(priceInCents: number): {
-  valid: boolean;
-  error?: string;
-} {
-  if (typeof priceInCents !== "number" || !Number.isInteger(priceInCents)) {
-    return { valid: false, error: "Price must be an integer value in cents" };
-  }
-
-  if (priceInCents < MINIMUM_AMOUNT_CENTS) {
-    return {
-      valid: false,
-      error: `Minimum amount is $${(MINIMUM_AMOUNT_CENTS / 100).toFixed(2)}`,
-    };
-  }
-
-  if (priceInCents > MAXIMUM_AMOUNT_CENTS) {
-    return {
-      valid: false,
-      error: `Maximum amount is $${(MAXIMUM_AMOUNT_CENTS / 100).toFixed(2)}`,
-    };
-  }
-
-  return { valid: true };
-}
-
-// Create Checkout Session action with enhanced security and error handling
 export const createCheckoutSession = actionClient
-  .schema(checkoutSchema)
-  .action(async ({ parsedInput }): Promise<CheckoutResult> => {
-    const startTime = Date.now();
-    logPaymentEvent("info", "Starting checkout session creation", {
-      skuId: parsedInput.skuId,
-      locale: parsedInput.locale,
-    });
-
-    let user: any = null;
-    
-    try {
-      // Use the same authentication method as login functionality
-      user = await getCurrentUser();
-
-      // Create supabase client after user authentication check
-      const supabase: SupabaseClient<Database> = createSupabaseServerClient();
-
-      // Authentication check
-      if (!user) {
-        logPaymentEvent("warn", "Checkout attempt by unauthenticated user");
-        return {
-          success: false,
-          message: "User not authenticated. Please log in to continue.",
-        };
-      }
-
-      logPaymentEvent("info", "User authenticated", { userId: user.id });
-
-      // 1. Get SKU details with enhanced error handling
-      const { data: sku, error: skuError } = (await supabase
-        .from("skus")
-        .select(`
-          *,
-          games!inner (
-            id,
-            merchant_id,
-            name
-          )
-        `)
-        .eq("id", parsedInput.skuId)
-        .single()) as { data: any; error: any };
-
-      if (skuError || !sku) {
-        logPaymentEvent("error", "SKU fetch failed", {
-          skuId: parsedInput.skuId,
-          error: skuError,
-        });
+  .schema(
+    z.object({
+      skuId: z.string().uuid(),
+      playerAccount: z.string().trim().min(1).max(128).optional(),
+      gameServer: z.string().trim().min(1).max(128).optional(),
+      buyerEmail: z.string().trim().email().max(254).optional(),
+      locale: z.enum(["en", "zh"]),
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    const user = await getCurrentUser();
+    if (!user) {
+      if (process.env.ALLOW_GUEST_CHECKOUT !== "true") {
         return {
           success: false,
           message:
-            "The requested product is not available. Please try again later.",
+            parsedInput.locale === "zh"
+              ? "请先登录后再进行购买。"
+              : "Please sign in before purchasing.",
         };
       }
-
-      // Validate SKU data
-      const priceInCents = sku.prices?.usd;
-      const priceValidation = validatePrice(priceInCents);
-
-      if (!priceValidation.valid || !priceInCents) {
-        logPaymentEvent("error", "Invalid price validation", {
-          skuId: parsedInput.skuId,
-          price: priceInCents,
-          error: priceValidation.error,
-        });
+      if (!parsedInput.buyerEmail?.trim()) {
         return {
           success: false,
           message:
-            priceValidation.error ||
-            "Invalid price configuration for this product.",
+            parsedInput.locale === "zh"
+              ? "游客购买请输入用于接收订单与发货通知的联系邮箱。"
+              : "Email is required for guest checkout.",
         };
       }
-
-      logPaymentEvent("info", "SKU validated", {
-        skuId: sku.id,
-        gameName: sku.games.name,
-        price: `$${(priceInCents / 100).toFixed(2)}`,
-      });
-
-      // 2. Pre-create a 'pending' order with enhanced error handling
-      const orderData = {
-        user_id: user.id,
-        sku_id: sku.id,
-        merchant_id: sku.games.merchant_id,
-        amount: priceInCents,
-        currency: "usd", // V1 is USD only as per PRD
-        status: "pending" as const,
+    }
+    if (
+      process.env.PAYMENTS_ENABLED !== "true" ||
+      !process.env.STRIPE_WEBHOOK_SECRET?.trim()
+    )
+      return {
+        success: false,
+        message: "Checkout is not available yet. Please check back later.",
       };
-
-      const { data: newOrder, error: orderError } = await (
-        supabase.from("orders") as any
-      )
-        .insert(orderData)
-        .select("id, created_at")
-        .single();
-
-      if (orderError || !newOrder) {
-        logPaymentEvent("error", "Order creation failed", {
-          orderData,
-          error: orderError,
-        });
-        return {
-          success: false,
-          message: "Unable to create order. Please try again later.",
-        };
-      }
-
-      const orderId = newOrder.id;
-      logPaymentEvent("info", "Order created successfully", {
-        orderId,
-        amount: `$${(priceInCents / 100).toFixed(2)}`,
-      });
-
-      // 3. Create Stripe Checkout Session with enhanced configuration
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-      if (!appUrl) {
-        throw new Error("NEXT_PUBLIC_APP_URL is not configured properly.");
-      }
-
-      // Prepare product data with fallbacks
-      const productName =
-        sku.name[parsedInput.locale] || sku.name.en || "Game Purchase";
-      const productDescription =
-        sku.description?.[parsedInput.locale] ||
-        sku.description?.en ||
-        "Digital game content";
-
-      const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-        payment_method_types: ["card"], // V1 supports cards only
-        line_items: [
-          {
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: productName,
-                description: productDescription,
-                images: sku.image_url ? [sku.image_url] : [],
-                metadata: {
-                  sku_id: sku.id,
-                  game_id: sku.game_id,
+    const stripe = getStripe();
+    const origin = getAppOrigin();
+    const db = createSupabaseAdminClient();
+    // All order amounts and merchant IDs come from the database, never the browser.
+    const { data: sku, error } = await db
+      .from("skus")
+      .select("*,games!inner(id,merchant_id,is_published)")
+      .eq("id", parsedInput.skuId)
+      .single();
+    if (error || !sku)
+      return { success: false, message: "Product is unavailable." };
+    if (
+      sku.is_published !== true ||
+      (sku as any).games?.is_published !== true
+    ) {
+      return { success: false, message: "Product is unpublished." };
+    }
+    const product = sku as unknown as {
+      id: string;
+      game_id: string;
+      name: { en: string; zh: string };
+      prices: { usd: number };
+      requires_recipient_info?: boolean;
+      games: { id: string; merchant_id: string; is_published?: boolean };
+    };
+    if (product.requires_recipient_info && !parsedInput.playerAccount) {
+      return {
+        success: false,
+        message:
+          parsedInput.locale === "zh"
+            ? "请填写接收账号/信息"
+            : "Recipient info is required",
+      };
+    }
+    const amount = product.prices.usd;
+    if (!Number.isSafeInteger(amount) || amount < 50 || amount > 999999)
+      return { success: false, message: "Invalid product price." };
+    const { data: order, error: orderError } = await db
+      .from("orders")
+      .insert({
+        user_id: user?.id || null,
+        buyer_email: user?.email || parsedInput.buyerEmail?.trim() || null,
+        player_account: parsedInput.playerAccount || null,
+        game_server: parsedInput.gameServer || null,
+        sku_id: product.id,
+        merchant_id: product.games.merchant_id,
+        amount,
+        currency: "usd",
+        payment_mode: process.env.STRIPE_SECRET_KEY?.trim().startsWith(
+          "sk_test_",
+        )
+          ? "test"
+          : "live",
+        status: "pending",
+      })
+      .select("id, access_token")
+      .single();
+    if (orderError || !order) throw new Error("Unable to create order");
+    let sessionId: string | undefined;
+    try {
+      const session = await stripe.checkout.sessions.create(
+        {
+          mode: "payment",
+          allowed_payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                unit_amount: amount,
+                product_data: {
+                  name: product.name[parsedInput.locale] || product.name.en,
                 },
               },
-              unit_amount: priceInCents,
+              quantity: 1,
             },
-            quantity: 1,
-          },
-        ],
-        mode: "payment",
-        success_url: `${appUrl}/${parsedInput.locale}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${appUrl}/${parsedInput.locale}/games/${sku.game_id}`,
-        client_reference_id: orderId, // Critical for webhook idempotency
-        customer_email: user.email || undefined,
-        metadata: {
-          orderId: orderId,
-          userId: user.id,
-          skuId: sku.id,
-          gameId: sku.game_id,
-          locale: parsedInput.locale,
+          ],
+          client_reference_id: order.id,
+          metadata: { orderId: order.id, userId: user?.id || "guest" },
+          customer_email: user?.email || parsedInput.buyerEmail || undefined,
+          success_url: `${origin}/${parsedInput.locale}/payment/success?session_id={CHECKOUT_SESSION_ID}&token=${order.access_token}&order_id=${order.id}`,
+          cancel_url: `${origin}/${parsedInput.locale}/payment/cancel`,
         },
-        // Enhanced security settings
-        billing_address_collection: "auto",
-        shipping_address_collection: { allowed_countries: [] }, // No shipping for digital goods
-        tax_id_collection: { enabled: false }, // V1 doesn't collect tax IDs
-        allow_promotion_codes: false, // V1 doesn't support promo codes
-      };
-
-      logPaymentEvent("info", "Creating Stripe session", {
-        orderId,
-        amount: priceInCents,
-        currency: "usd",
-      });
-
-      const session = await stripe.checkout.sessions.create(sessionConfig);
-
-      if (!session.url) {
-        throw new Error("Stripe session creation failed: No URL returned");
-      }
-
-      // Update order with Stripe session ID
-      const { error: updateError } = await (supabase.from("orders") as any)
-        .update({
-          stripe_checkout_session_id: session.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId);
-
-      if (updateError) {
-        logPaymentEvent("warn", "Failed to update order with session ID", {
-          orderId,
-          sessionId: session.id,
-          error: updateError,
-        });
-        // Don't fail the checkout, but log the issue
-      }
-
-      const duration = Date.now() - startTime;
-      logPaymentEvent("info", "Checkout session created successfully", {
-        orderId,
-        sessionId: session.id,
-        duration: `${duration}ms`,
-      });
-
+        { idempotencyKey: `checkout:${order.id}` },
+      );
+      sessionId = session.id;
+      if (!session.url) throw new Error("Missing checkout URL");
+      const result = await db
+        .from("orders")
+        .update({ stripe_checkout_session_id: session.id })
+        .eq("id", order.id)
+        .eq("status", "pending")
+        .select("id")
+        .single();
+      if (result.error || !result.data)
+        throw new Error("Unable to attach checkout session");
       return {
         success: true,
-        message: "Checkout session created successfully.",
+        message: "Checkout ready",
         checkoutUrl: session.url,
       };
     } catch (error) {
-      const duration = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-
-      // Enhanced error logging for debugging
-      console.error("=== PAYMENT ERROR DETAILS ===");
-      console.error("Error:", error);
-      console.error("Error Message:", errorMessage);
-      console.error("Error Stack:", error instanceof Error ? error.stack : "No stack trace");
-      console.error("SKU ID:", parsedInput.skuId);
-      console.error("User ID:", user?.id || "No user");
-      console.error("Duration:", `${duration}ms`);
-      console.error("Stripe API Version:", "2024-06-20");
-      console.error("==============================");
-
-      logPaymentEvent("error", "Checkout session creation failed", {
-        skuId: parsedInput.skuId,
-        error: errorMessage,
-        duration: `${duration}ms`,
-        errorDetails: error,
-        userId: user?.id,
-        stripeApiVersion: "2024-06-20",
-      });
-
-      // Attempt to update any created order to 'failed' status
-      try {
-        // We don't have the orderId here due to the scope, but we could enhance this
-        // to track created orders in a better way for cleanup
-      } catch (cleanupError) {
-        logPaymentEvent("error", "Failed to cleanup after checkout error", {
-          cleanupError,
-        });
+      // If expiry cannot be confirmed, retain the pending order for reconciliation.
+      // Never mark an uncertain payment as failed or return an unbound checkout URL.
+      let safeToFail = !sessionId;
+      if (sessionId) {
+        try {
+          await stripe.checkout.sessions.expire(sessionId);
+          safeToFail = true;
+        } catch {
+          console.error("Checkout needs reconciliation", { orderId: order.id });
+        }
       }
-
+      if (safeToFail)
+        await db
+          .from("orders")
+          .update({ status: "failed" })
+          .eq("id", order.id)
+          .eq("status", "pending");
+      console.error("Checkout creation failed", {
+        orderId: order.id,
+        error: error instanceof Error ? error.name : "Unknown",
+      });
       return {
         success: false,
-        message: `Payment processing failed: ${errorMessage}`,
+        message: "Checkout could not be created. Please try again later.",
       };
     }
   });

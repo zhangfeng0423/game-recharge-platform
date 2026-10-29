@@ -50,16 +50,7 @@ export function SkuCard({
             </div>
           </div>
         )}
-
-        {/* Badge for popular items (you could add this logic later) */}
-        {sku.prices.usd < 1000 && (
-          <div className="absolute top-2 right-2 rounded-full bg-green-500 px-2 py-1 text-xs font-medium text-white">
-            {translations.popular}
-          </div>
-        )}
       </div>
-
-      {/* SKU Info */}
       <div className="p-4">
         <div className="mb-3">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">

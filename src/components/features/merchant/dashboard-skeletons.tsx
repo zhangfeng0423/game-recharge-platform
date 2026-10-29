@@ -3,7 +3,10 @@ export function DashboardSkeleton() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white p-6 rounded-lg border border-gray-200">
+          <div
+            key={i}
+            className="bg-white p-6 rounded-lg border border-gray-200"
+          >
             <div className="h-4 w-24 bg-gray-200 rounded mb-2 animate-pulse" />
             <div className="h-8 w-32 bg-gray-200 rounded animate-pulse" />
           </div>

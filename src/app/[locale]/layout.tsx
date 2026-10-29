@@ -1,8 +1,9 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
-import { SupabaseDebugger } from "@/components/debug/supabase-debugger";
+import { getMessages, setRequestLocale } from "next-intl/server";
+import { Footer } from "@/components/layout/footer";
+import { Navbar } from "@/components/layout/navbar";
 import { routing } from "@/i18n/routing";
 import "../globals.css";
 
@@ -25,22 +26,33 @@ export default async function LocaleLayout({ children, params }: Props) {
   const { locale } = await params;
 
   // 确保传入的 `locale` 是有效的
-  if (!routing.locales.includes(locale as any)) {
+  if (!routing.locales.includes(locale as "en" | "zh")) {
     notFound();
   }
 
   // 提供所有共享的消息
-  const messages = await getMessages();
+  setRequestLocale(locale);
+  const messages = await getMessages({ locale });
 
   return (
     <html lang={locale}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <NextIntlClientProvider messages={messages}>
-          {children}
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          {process.env.STRIPE_SECRET_KEY?.trim().startsWith("sk_test_") && (
+            <aside className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-center text-sm text-amber-950">
+              {locale === "zh"
+                ? "当前为支付测试模式，商品与订单仅用于流程验证，请勿实际充值。"
+                : "Payment test mode. Products and orders are for workflow verification; do not deliver real game credit."}
+            </aside>
+          )}
+          <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-950">
+            <Navbar locale={locale} />
+            <div className="flex-1">{children}</div>
+            <Footer locale={locale} />
+          </div>
         </NextIntlClientProvider>
-        {process.env.NODE_ENV === "development" && <SupabaseDebugger />}
       </body>
     </html>
   );
