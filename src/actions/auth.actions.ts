@@ -2,8 +2,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { actionClient } from "@/lib/action-client";
-import { getAppOrigin } from "@/lib/app-origin";
 import { ensureProfile } from "@/lib/profiles";
+import { getRequestOrigin } from "@/lib/request-origin";
 import {
   createSupabaseClientForServerActions,
   createSupabaseServerClientWithCookies,
@@ -67,8 +67,20 @@ export const registerAction = actionClient
       }),
   )
   .action(async ({ parsedInput }): Promise<AuthResult> => {
+    if (
+      parsedInput.role === "MERCHANT" &&
+      process.env.ALLOW_MERCHANT_SIGNUP !== "true"
+    ) {
+      return {
+        success: false,
+        message:
+          parsedInput.locale === "zh"
+            ? "当前为自营商城模式，未开放商户自主注册。"
+            : "Merchant self-registration is closed in store mode.",
+      };
+    }
     const db = await createSupabaseClientForServerActions();
-    const origin = getAppOrigin();
+    const origin = await getRequestOrigin();
     const { data, error } = await db.auth.signUp({
       email: parsedInput.email,
       password: parsedInput.password,

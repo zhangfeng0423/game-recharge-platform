@@ -158,3 +158,9 @@ If any validation task fails, **STOP** the workflow and report the failure.
 - The old test/debug endpoints and mock order/merchant pages are removed. Database failures must be visible rather than replaced by fake purchasable goods.
 - Node.js 22 is the deployment runtime. Browser tests use a separate `.next-e2e` build with explicit fixture credentials; do not deploy it.
 - The legacy SQL filenames require explicit dependency-order setup. Inspect existing migration history; do not reset real data or blindly run db push.
+
+## Validated storefront access fixes (2026-10-29)
+
+- Security-definer management RPCs must explicitly reject missing profiles and non-operator roles. A SELECT INTO that returns no rows sets its target to NULL; COALESCE inside the SELECT does not make the no-row case false. Authorization must fail closed.
+- Drop the actual legacy permissive SELECT policy before replacing it; permissive PostgreSQL RLS policies combine with OR. Public SKU visibility requires both SKU and parent publication. Service-role Checkout queries must independently enforce both flags.
+- Apply `20261029160000_storefront_access_boundaries.sql` after the SaaS migration for existing installations. Keep the fresh-install definitions consistent, but do not assume editing an already-applied migration changes a remote database.

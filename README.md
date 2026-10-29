@@ -43,8 +43,10 @@ For a **fresh** Supabase project, run these SQL files in the SQL editor in this 
 3. `supabase/migrations/20261028160000_launch_hardening.sql`
 4. `supabase/migrations/20261028170000_manual_fulfillment.sql`
 5. `supabase/migrations/20261028180000_payment_mode.sql`
+6. `supabase/migrations/20261029000000_saas_storefront_and_redeem.sql`
+7. `supabase/migrations/20261029160000_storefront_access_boundaries.sql`
 
-For a project that already has the two legacy schemas, inspect compatibility and apply only the three new migrations. The legacy filenames do not form a standard timestamp sequence: **do not blindly run `supabase db push`**. Reconcile migration history before adopting automated migrations.
+For a project that already has the two legacy schemas, inspect compatibility and apply only the missing migrations in the order above. If a previous draft of the SaaS migration was already applied, inspect its schema compatibility first and apply the access-boundaries migration as a separate upgrade; editing an applied file does not upgrade the remote database. The legacy filenames do not form a standard timestamp sequence: **do not blindly run `supabase db push`**. Reconcile migration history before adopting automated migrations.
 
 The hardening migration removes direct client writes to financial orders and role assignments, restricts legacy analytics access, creates profiles within account-creation transactions, and adds an atomic payment-event function. The fulfillment migration adds recipient details, a separate delivery lifecycle, and an operator-scoped confirmation function.
 
@@ -52,9 +54,9 @@ The hardening migration removes direct client writes to financial orders and rol
 
 - Configure Supabase Site URL and redirect allowlists for the actual application origins.
 - Email confirmation and production email delivery require working Supabase email settings.
-- Password recovery starts at `/<locale>/auth/forgot`. Allow the exact callback URL `https://YOUR_HOST/<locale>/auth/callback?next=%2F<locale>%2Fauth%2Freset` for each supported locale. The default Supabase recovery template uses `{{ .ConfirmationURL }}`; with PKCE, open the email link in the same browser that requested it. A verified session is required before setting a new password.
+- Password recovery starts at `/<locale>/auth/forgot`. Allow the exact callback URL `https://YOUR_HOST/<locale>/auth/callback?next=%2F<locale>%2Fauth%2Freset` for each supported locale. Set the Supabase **Reset password** email body to `supabase/templates/recovery.html`. This template is designed for recovery requests from this app: `redirectTo` already includes the `next` query parameter. It links directly to the app callback with `TokenHash`; the server verifies the one-time token with Supabase and redirects to a clean reset URL. This avoids requiring browsers to connect directly to the Supabase project domain. A verified session is required before setting a new password. The default ConfirmationURL / PKCE flow is also supported, but requires the same browser that requested it.
 - Configure Google OAuth separately if you want to offer Google sign-in. Its callback is `/<locale>/auth/callback`.
-- A user may register as a merchant. **ADMIN is never inferred from an email address or signup metadata.** Set the initial operator's profile role through trusted database administration after verifying the account.
+- Public registration creates a USER. Merchant and ADMIN roles require trusted operator administration. **ADMIN is never inferred from an email address or signup metadata.** Set the initial operator's profile role through trusted database administration after verifying the account.
 - Audit existing ADMIN profiles from the old application before launch: earlier code inferred privilege from email text.
 
 ## Payments and manual fulfillment

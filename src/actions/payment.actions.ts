@@ -9,15 +9,34 @@ export const createCheckoutSession = actionClient
   .schema(
     z.object({
       skuId: z.string().uuid(),
-      playerAccount: z.string().trim().min(1).max(128),
-      gameServer: z.string().trim().min(1).max(128),
+      playerAccount: z.string().trim().min(1).max(128).optional(),
+      gameServer: z.string().trim().min(1).max(128).optional(),
+      buyerEmail: z.string().trim().email().max(254).optional(),
       locale: z.enum(["en", "zh"]),
     }),
   )
   .action(async ({ parsedInput }) => {
     const user = await getCurrentUser();
-    if (!user)
-      return { success: false, message: "Please sign in before purchasing." };
+    if (!user) {
+      if (process.env.ALLOW_GUEST_CHECKOUT !== "true") {
+        return {
+          success: false,
+          message:
+            parsedInput.locale === "zh"
+              ? "请先登录后再进行购买。"
+              : "Please sign in before purchasing.",
+        };
+      }
+      if (!parsedInput.buyerEmail?.trim()) {
+        return {
+          success: false,
+          message:
+            parsedInput.locale === "zh"
+              ? "游客购买请输入用于接收订单与发货通知的联系邮箱。"
+              : "Email is required for guest checkout.",
+        };
+      }
+    }
     if (
       process.env.PAYMENTS_ENABLED !== "true" ||
       !process.env.STRIPE_WEBHOOK_SECRET?.trim()
@@ -32,27 +51,44 @@ export const createCheckoutSession = actionClient
     // All order amounts and merchant IDs come from the database, never the browser.
     const { data: sku, error } = await db
       .from("skus")
-      .select("*,games!inner(id,merchant_id)")
+      .select("*,games!inner(id,merchant_id,is_published)")
       .eq("id", parsedInput.skuId)
       .single();
     if (error || !sku)
       return { success: false, message: "Product is unavailable." };
+    if (
+      sku.is_published !== true ||
+      (sku as any).games?.is_published !== true
+    ) {
+      return { success: false, message: "Product is unpublished." };
+    }
     const product = sku as unknown as {
       id: string;
       game_id: string;
       name: { en: string; zh: string };
       prices: { usd: number };
-      games: { id: string; merchant_id: string };
+      requires_recipient_info?: boolean;
+      games: { id: string; merchant_id: string; is_published?: boolean };
     };
+    if (product.requires_recipient_info && !parsedInput.playerAccount) {
+      return {
+        success: false,
+        message:
+          parsedInput.locale === "zh"
+            ? "请填写接收账号/信息"
+            : "Recipient info is required",
+      };
+    }
     const amount = product.prices.usd;
     if (!Number.isSafeInteger(amount) || amount < 50 || amount > 999999)
       return { success: false, message: "Invalid product price." };
     const { data: order, error: orderError } = await db
       .from("orders")
       .insert({
-        user_id: user.id,
-        player_account: parsedInput.playerAccount,
-        game_server: parsedInput.gameServer,
+        user_id: user?.id || null,
+        buyer_email: user?.email || parsedInput.buyerEmail?.trim() || null,
+        player_account: parsedInput.playerAccount || null,
+        game_server: parsedInput.gameServer || null,
         sku_id: product.id,
         merchant_id: product.games.merchant_id,
         amount,
@@ -64,7 +100,7 @@ export const createCheckoutSession = actionClient
           : "live",
         status: "pending",
       })
-      .select("id")
+      .select("id, access_token")
       .single();
     if (orderError || !order) throw new Error("Unable to create order");
     let sessionId: string | undefined;
@@ -86,9 +122,9 @@ export const createCheckoutSession = actionClient
             },
           ],
           client_reference_id: order.id,
-          metadata: { orderId: order.id, userId: user.id },
-          customer_email: user.email || undefined,
-          success_url: `${origin}/${parsedInput.locale}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+          metadata: { orderId: order.id, userId: user?.id || "guest" },
+          customer_email: user?.email || parsedInput.buyerEmail || undefined,
+          success_url: `${origin}/${parsedInput.locale}/payment/success?session_id={CHECKOUT_SESSION_ID}&token=${order.access_token}&order_id=${order.id}`,
           cancel_url: `${origin}/${parsedInput.locale}/payment/cancel`,
         },
         { idempotencyKey: `checkout:${order.id}` },

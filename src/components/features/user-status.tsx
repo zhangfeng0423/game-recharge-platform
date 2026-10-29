@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { logoutAction } from "@/actions/auth.actions";
@@ -19,6 +19,8 @@ export function UserStatus({
 }) {
   const t = useTranslations("common");
   const router = useRouter();
+  const pathname = usePathname();
+  const isGameDetailPage = pathname?.includes("/games/");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   if (!initialUser) return <Link href={`/${locale}/auth`}>{t("login")}</Link>;
@@ -36,28 +38,30 @@ export function UserStatus({
       {initialUser.role === "ADMIN" && (
         <Link href={`/${locale}/dashboard/admin`}>Admin</Link>
       )}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          setError(false);
-          try {
-            const result = await logoutAction();
-            if (result.data?.success) {
-              router.refresh();
-            } else {
+      {!isGameDetailPage && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError(false);
+            try {
+              const result = await logoutAction();
+              if (result.data?.success) {
+                router.refresh();
+              } else {
+                setError(true);
+              }
+            } catch {
               setError(true);
+            } finally {
+              setBusy(false);
             }
-          } catch {
-            setError(true);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        {locale === "zh" ? "退出" : "Sign out"}
-      </button>
+          }}
+        >
+          {locale === "zh" ? "退出" : "Sign out"}
+        </button>
+      )}
       {error && (
         <span role="alert">
           {locale === "zh"

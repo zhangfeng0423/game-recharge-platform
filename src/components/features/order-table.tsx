@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { FulfillmentControl } from "./fulfillment-control";
 export interface PortalOrder {
-  payment_mode?: "test" | "live" | "unknown";
+  payment_mode?: "test" | "live" | "unknown" | "redeem";
   player_account?: string | null;
   game_server?: string | null;
   fulfillment_status?: string;
@@ -61,36 +61,54 @@ export function OrderTable({
         <tbody>
           {orders.map((o) => (
             <tr key={o.id}>
-              <td className="border-b p-3 font-mono">{o.id}</td>
+              <td className="border-b p-3 font-mono">
+                <Link
+                  href={`/${locale}/orders/${o.id}`}
+                  className="text-blue-600 hover:underline"
+                >
+                  {o.id}
+                </Link>
+              </td>
               <td className="border-b p-3">
                 {o.sku?.name[zh ? "zh" : "en"] ?? "—"}
               </td>
               <td className="border-b p-3">
-                {formatPrice(o.amount, o.currency, locale)}
+                {o.payment_mode === "redeem"
+                  ? zh
+                    ? "卡密兑换"
+                    : "Redeemed"
+                  : formatPrice(o.amount, o.currency, locale)}
               </td>
               <td className="border-b p-3">
                 <p>
-                  {o.status === "completed"
+                  {o.payment_mode === "redeem"
                     ? zh
-                      ? "已收款"
-                      : "Paid"
-                    : o.status === "failed"
+                      ? "卡密核销成功"
+                      : "Code Redeemed"
+                    : o.status === "completed"
                       ? zh
-                        ? "已失效／失败"
-                        : "Expired / failed"
-                      : zh
-                        ? "待支付确认"
-                        : "Awaiting payment confirmation"}
+                        ? "已收款"
+                        : "Paid"
+                      : o.status === "failed"
+                        ? zh
+                          ? "已失效／失败"
+                          : "Expired / failed"
+                        : zh
+                          ? "待支付确认"
+                          : "Awaiting payment confirmation"}
                 </p>
-                {o.payment_mode !== "live" && (
-                  <p className="text-amber-700">
-                    {o.payment_mode === "test"
-                      ? zh
-                        ? "测试订单，勿实际充值"
-                        : "Test order — do not deliver real goods"
-                      : zh
-                        ? "历史支付需核实"
-                        : "Historical payment needs verification"}
+                {o.payment_mode === "test" && (
+                  <p className="text-amber-700 text-xs">
+                    {zh
+                      ? "测试订单，勿实际充值"
+                      : "Test order — do not deliver real goods"}
+                  </p>
+                )}
+                {o.payment_mode === "unknown" && (
+                  <p className="text-amber-700 text-xs">
+                    {zh
+                      ? "历史支付需核实"
+                      : "Historical payment needs verification"}
                   </p>
                 )}
               </td>

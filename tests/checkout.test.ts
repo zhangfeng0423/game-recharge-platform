@@ -71,7 +71,8 @@ it("uses the catalogue price and persists recipient/session before returning a U
       game_id: "game",
       name: { en: "Pack" },
       prices: { usd: 1099 },
-      games: { id: "game", merchant_id: "owner" },
+      is_published: true,
+      games: { id: "game", merchant_id: "owner", is_published: true },
     },
     error: null,
   });
@@ -123,7 +124,8 @@ it("does not return an unbound payment link after persistence fails", async () =
       game_id: "game",
       name: { en: "Pack" },
       prices: { usd: 1099 },
-      games: { id: "game", merchant_id: "owner" },
+      is_published: true,
+      games: { id: "game", merchant_id: "owner", is_published: true },
     },
     error: null,
   });
@@ -146,3 +148,32 @@ it("does not return an unbound payment link after persistence fails", async () =
   expect(m.expire).toHaveBeenCalledWith("cs_1");
   expect(cleanup.update).toHaveBeenCalledWith({ status: "failed" });
 });
+
+it.each([
+  { skuPublished: false, gamePublished: true },
+  { skuPublished: true, gamePublished: false },
+])(
+  "refuses unpublished products before creating an order or Stripe session: %j",
+  async ({ skuPublished, gamePublished }) => {
+    const sku = chain({
+      data: {
+        id: input.skuId,
+        is_published: skuPublished,
+        name: { en: "Unavailable" },
+        prices: { usd: 100 },
+        games: {
+          id: "game",
+          merchant_id: "owner",
+          is_published: gamePublished,
+        },
+      },
+      error: null,
+    });
+    m.from.mockReturnValueOnce(sku);
+    const result = await createCheckoutSession(input);
+    expect(result.data?.success).toBe(false);
+    expect(m.from).toHaveBeenCalledTimes(1);
+    expect(sku.insert).not.toHaveBeenCalled();
+    expect(m.create).not.toHaveBeenCalled();
+  },
+);

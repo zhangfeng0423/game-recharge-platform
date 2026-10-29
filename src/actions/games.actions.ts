@@ -8,12 +8,17 @@ export interface GamesResult {
   message: string;
   data?: any;
 }
-const selection = "*,skus(*)";
+const publicSkuSelection =
+  "skus(id,game_id,name,description,prices,image_url,delivery_mode,external_url,requires_recipient_info,recipient_label,created_at,updated_at)";
+const selection = `*,${publicSkuSelection}`;
+
 export async function getGames(limit = 20, offset = 0): Promise<GamesResult> {
   const db = createSupabaseServerClient();
   const { data, error, count } = await db
     .from("games")
     .select(selection, { count: "exact" })
+    .eq("is_published", true)
+    .eq("skus.is_published", true)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw new Error("Unable to load catalogue");
@@ -35,6 +40,8 @@ export async function getGameByIdServer(id: string): Promise<GamesResult> {
     .from("games")
     .select(selection)
     .eq("id", id)
+    .eq("is_published", true)
+    .eq("skus.is_published", true)
     .maybeSingle();
   if (error) throw new Error("Unable to load game");
   return {
@@ -54,8 +61,11 @@ export async function getGameSkus(gameId: string) {
   const db = createSupabaseServerClient();
   const { data, error } = await db
     .from("skus")
-    .select("*")
-    .eq("game_id", gameId);
+    .select(
+      "id,game_id,name,description,prices,image_url,delivery_mode,external_url,requires_recipient_info,recipient_label,created_at,updated_at",
+    )
+    .eq("game_id", gameId)
+    .eq("is_published", true);
   if (error) throw new Error("Unable to load products");
   return { success: true, message: "Products loaded", data };
 }
@@ -72,6 +82,8 @@ export const searchGames = actionClient
     let query = db
       .from("games")
       .select(selection, { count: "exact" })
+      .eq("is_published", true)
+      .eq("skus.is_published", true)
       .order("created_at", { ascending: false });
     if (parsedInput.query?.trim()) {
       const safe = parsedInput.query.replace(/[^\p{L}\p{N} _-]/gu, "").trim();

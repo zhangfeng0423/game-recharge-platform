@@ -74,6 +74,10 @@ export const saveSku = actionClient
       description: names,
       amount: z.number().int().min(50).max(999999),
       image_url: image,
+      delivery_mode: z.enum(["auto", "manual", "showcase"]).default("auto"),
+      auto_delivery_content: z.string().trim().max(2000).optional(),
+      external_url: image,
+      requires_recipient_info: z.boolean().default(false),
     }),
   )
   .action(async ({ parsedInput }) => {
@@ -85,19 +89,42 @@ export const saveSku = actionClient
       .eq("merchant_id", user.id)
       .single();
     if (gameError || !game) throw new Error("Game not found");
-    const { id, locale, amount, ...fields } = parsedInput;
-    const payload = {
-      ...fields,
-      prices: { usd: amount },
-      image_url: fields.image_url || null,
-    };
-    const query = id
-      ? db.from("skus").update(payload).eq("id", id).eq("game_id", game.id)
-      : db.from("skus").insert(payload);
-    const { data, error } = await query.select("id").single();
-    if (error || !data) throw new Error("Unable to save product");
-    revalidatePath(`/${locale}/games/${game.id}`);
-    revalidatePath(`/${locale}/dashboard/merchant/games`);
+
+    if (
+      parsedInput.delivery_mode === "auto" &&
+      !parsedInput.auto_delivery_content?.trim()
+    ) {
+      throw new Error(
+        parsedInput.locale === "zh"
+          ? "自动发货模式必须填写发货凭据/内容"
+          : "Delivery secret content is required for auto fulfillment mode",
+      );
+    }
+
+    const { error: saveError } = await db.rpc("save_sku_with_secret", {
+      p_id: parsedInput.id || null,
+      p_game_id: parsedInput.game_id,
+      p_name: parsedInput.name,
+      p_description: parsedInput.description,
+      p_prices: { usd: parsedInput.amount },
+      p_image_url: parsedInput.image_url || null,
+      p_delivery_mode: parsedInput.delivery_mode,
+      p_external_url: parsedInput.external_url || null,
+      p_requires_recipient_info: parsedInput.requires_recipient_info,
+      p_recipient_label: {
+        en: "Recipient / Account Info",
+        zh: "接收账号 / 备注信息",
+      },
+      p_is_published: true,
+      p_secret_content: parsedInput.auto_delivery_content?.trim() || null,
+    });
+
+    if (saveError) {
+      throw new Error(`Unable to save product: ${saveError.message}`);
+    }
+
+    revalidatePath(`/${parsedInput.locale}/games/${game.id}`);
+    revalidatePath(`/${parsedInput.locale}/dashboard/merchant/games`);
     return { success: true };
   });
 export const deleteSku = actionClient

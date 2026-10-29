@@ -102,3 +102,18 @@ test("forgot password requests email and reset requires a verified session", asy
   await page.goto("/en/auth/reset");
   await expect(page).toHaveURL(/\/en\/auth\/forgot/);
 });
+
+test("guest or buyer enters redeem page, redeems valid code, and views delivery receipt", async ({
+  page,
+}) => {
+  await page.goto("/en/redeem");
+  await expect(
+    page.getByRole("heading", { name: "Redemption Center" }),
+  ).toBeVisible();
+  await page.getByPlaceholder("NX-XXXX-XXXX-XXXX").fill("NX-TEST-REDEEM-OK");
+  await page.getByRole("button", { name: "Redeem Now" }).click();
+  await expect(page).toHaveURL(
+    /\/en\/orders\/50000000-0000-4000-8000-000000000002/,
+  );
+  await expect(page.getByText("FIXTURE_SECRET_DOWNLOAD_KEY")).toBeVisible();
+});

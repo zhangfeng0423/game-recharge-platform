@@ -2,6 +2,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
+import { Footer } from "@/components/layout/footer";
+import { Navbar } from "@/components/layout/navbar";
 import { routing } from "@/i18n/routing";
 import "../globals.css";
 
@@ -45,7 +47,11 @@ export default async function LocaleLayout({ children, params }: Props) {
                 : "Payment test mode. Products and orders are for workflow verification; do not deliver real game credit."}
             </aside>
           )}
-          {children}
+          <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-950">
+            <Navbar locale={locale} />
+            <div className="flex-1">{children}</div>
+            <Footer locale={locale} />
+          </div>
         </NextIntlClientProvider>
       </body>
     </html>

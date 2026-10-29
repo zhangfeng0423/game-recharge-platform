@@ -12,13 +12,27 @@ export default async function MerchantGames({
   const db = await createSupabaseServerClientWithCookies();
   const { data, error } = await db
     .from("games")
-    .select("*,skus(*)")
+    .select("*,skus(*,sku_fulfillment_secrets(content))")
     .eq("merchant_id", user.id)
     .order("created_at", { ascending: false });
   if (error) throw new Error("Unable to load products");
+
+  const formattedGames = ((data as any[]) || []).map((g) => ({
+    ...g,
+    skus: (g.skus || []).map((s: any) => ({
+      ...s,
+      auto_delivery_content:
+        s.sku_fulfillment_secrets?.content ||
+        (Array.isArray(s.sku_fulfillment_secrets)
+          ? s.sku_fulfillment_secrets[0]?.content
+          : "") ||
+        "",
+    })),
+  }));
+
   return (
     <CatalogueEditor
-      games={data as unknown as GameWithSkus[]}
+      games={formattedGames as unknown as GameWithSkus[]}
       locale={locale as "en" | "zh"}
     />
   );

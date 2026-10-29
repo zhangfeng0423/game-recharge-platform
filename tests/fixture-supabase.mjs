@@ -15,6 +15,9 @@ const sku = {
   description: { en: "100 test crystals", zh: "100 测试水晶" },
   prices: { usd: 1099 },
   image_url: null,
+  delivery_mode: "manual",
+  is_published: true,
+  requires_recipient_info: true,
   created_at: time,
   updated_at: time,
 };
@@ -24,6 +27,7 @@ const game = {
   name: { en: "Test Adventure", zh: "测试冒险" },
   description: { en: "A test catalogue item", zh: "测试目录商品" },
   banner_url: null,
+  is_published: true,
   skus: [sku],
   created_at: time,
   updated_at: time,
@@ -43,6 +47,22 @@ const orders = [
     status: "pending",
     payment_mode: "test",
     stripe_checkout_session_id: "cs_fixture_pending",
+    created_at: time,
+    updated_at: time,
+    sku,
+  },
+  {
+    id: "50000000-0000-4000-8000-000000000002",
+    user_id: ids.buyer,
+    merchant_id: ids.merchant,
+    sku_id: ids.sku,
+    amount: 1099,
+    currency: "usd",
+    status: "completed",
+    payment_mode: "redeem",
+    access_token: "70000000-0000-4000-8000-000000000002",
+    fulfillment_status: "fulfilled",
+    fulfillment_note: "FIXTURE_SECRET_DOWNLOAD_KEY",
     created_at: time,
     updated_at: time,
     sku,
@@ -94,6 +114,18 @@ http
       res.end(JSON.stringify(data));
     };
     if (url.pathname === "/health") return json({ ok: true });
+    if (url.pathname === "/rest/v1/rpc/redeem_product_code") {
+      if (body.p_code === "NX-TEST-REDEEM-OK") {
+        return json({
+          order_id: "50000000-0000-4000-8000-000000000002",
+          access_token: "70000000-0000-4000-8000-000000000002",
+          sku_id: ids.sku,
+          fulfillment_status: "fulfilled",
+          fulfillment_note: "FIXTURE_SECRET_DOWNLOAD_KEY",
+        });
+      }
+      return json({ message: "INVALID_REDEEM_CODE" }, 400);
+    }
     if (url.pathname === "/auth/v1/recover") return json({});
     if (url.pathname === "/auth/v1/token") {
       const user = users.find((u) => u.email === body.email);
@@ -139,7 +171,11 @@ http
             ? [
                 {
                   ...sku,
-                  games: { id: game.id, merchant_id: game.merchant_id },
+                  games: {
+                    id: game.id,
+                    merchant_id: game.merchant_id,
+                    is_published: true,
+                  },
                 },
               ]
             : table === "profiles"
@@ -151,9 +187,19 @@ http
               : table === "orders"
                 ? orders
                 : [];
-      for (const [key, value] of url.searchParams)
-        if (value.startsWith("eq."))
+      for (const [key, value] of url.searchParams) {
+        if (!value.startsWith("eq.")) continue;
+        if (key === "skus.is_published") {
+          rows = rows.map((x) => ({
+            ...x,
+            skus: (x.skus || []).filter(
+              (s) => String(s.is_published) === value.slice(3),
+            ),
+          }));
+        } else {
           rows = rows.filter((x) => String(x[key]) === value.slice(3));
+        }
+      }
       if (req.method === "HEAD") {
         res.writeHead(200, { "Content-Range": `0-0/${rows.length}` });
         return res.end();
